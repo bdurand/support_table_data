@@ -1,0 +1,14 @@
+1:
+  name: Red
+  hex: "0xFF0000"
+
+3:
+  name: Blue
+  hex: "0x0000FF"
+
+4:
+  name: Dark Gray
+  hex: "0x333333"
+
+9:
+  name: Purple
