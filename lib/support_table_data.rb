@@ -160,8 +160,6 @@ module SupportTableData
     def data_directory
       if defined?(@data_directory) && @data_directory
         @data_directory
-      elsif defined?(Rails.root)
-        File.join(Rails.root&.to_s, "db", "support_tables")
       end
     end
   end
