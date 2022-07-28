@@ -57,6 +57,11 @@ describe SupportTableData do
       expect(Color.light_gray).to eq light_gray
       expect(Color.dark_gray).to eq dark_gray
     end
+
+    it "can limit what methods get defined" do
+      expect(Color.respond_to?(:light_gray)).to eq true
+      expect(Color.respond_to?(:purple)).to eq false
+    end
   end
 
   describe "define_predicates_from" do
@@ -65,6 +70,11 @@ describe SupportTableData do
       expect(red.red?).to eq true
       expect(red.dark_gray?).to eq false
       expect(dark_gray.dark_gray?).to eq true
+    end
+
+    it "can limit what methods get defined" do
+      expect(Color.new.respond_to?(:light_gray?)).to eq true
+      expect(Color.new.respond_to?(:purple?)).to eq false
     end
   end
 end

@@ -4,9 +4,9 @@ Gem::Specification.new do |spec|
   spec.authors = ["Brian Durand"]
   spec.email = ["bbdurand@gmail.com"]
 
-  spec.summary = "Extension to load and sync data in ActiveRecord for small support tables from YAML files."
+  spec.summary = "ActiveRecord extension for loading and syncing data in small support tables from YAML or JSON files."
 
-  spec.homepage = "https://github.com/bdurand/support_table_cache"
+  spec.homepage = "https://github.com/bdurand/support_table_data"
   spec.license = "MIT"
 
   # Specify which files should be added to the gem when it is released.
