@@ -12,7 +12,7 @@ require "json"
 module SupportTableData
   extend ActiveSupport::Concern
 
-  class_methods do
+  module ClassMethods
     # Synchronize the rows in the table with the values defined in the data files added with
     # `add_support_table_data`. Note that rows will not be deleted if they are no longer in
     # the data files. This method should normally be called from a database or seed migration.
@@ -92,7 +92,7 @@ module SupportTableData
 
     # Load the data for the support table from the data files.
     #
-    # @return [Hash<Hash>] Merged hash of all the support table data.
+    # @return [Hash<String, Hash>] Merged hash of all the support table data.
     def support_table_data
       @support_table_data_files ||= []
       data = {}
@@ -157,7 +157,7 @@ module SupportTableData
     # Specify the directory where data files live by default.
     attr_writer :data_directory
 
-    # Get the directory where data files live by default. If you are running in a Rails environment,
+    # The directory where data files live by default. If you are running in a Rails environment,
     # then this will be `db/support_tables`. Otherwise the current working directory will be used.
     #
     # @return [String]
