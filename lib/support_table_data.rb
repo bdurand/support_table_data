@@ -1,13 +1,10 @@
 # frozen_string_literal: true
 
-require "yaml"
-require "json"
-
 # This concern can be mixed into models that represent static support tables. These
 # would be small tables that have a limited number of rows and which have values that
 # are often tied into logic in the code.
 #
-# The values that should be in support tables can be defined in YAML or JSON files. These
+# The values that should be in support tables can be defined in YAML, JSON, or CSV files. These
 # values can then be synced to the database and helper methods can be generated from them.
 module SupportTableData
   extend ActiveSupport::Concern
@@ -21,12 +18,15 @@ module SupportTableData
     # @return [void]
     def sync_table_data!
       key_attribute = (support_table_key_attribute || :id).to_s
-      canonical_data = support_table_data
+      canonical_data = support_table_data.each_with_object({}) { |attributes, hash| hash[attributes[key_attribute].to_s] = attributes }
       records = where(key_attribute => canonical_data.keys)
 
       records.each do |record|
         key = record[key_attribute].to_s
-        record.attributes = canonical_data.delete(key)
+        attributes = canonical_data.delete(key)
+        attributes&.each do |name, value|
+          record.send("#{name}=", value)
+        end
         record.save! if record.changed?
       end
 
@@ -42,7 +42,7 @@ module SupportTableData
     # Add a data file the contains the support table data. This method can be called multiple times to
     # load data from multiple files.
     #
-    # @param data_file_path [String, Pathname] Path to a YAML or JSON file containing data for this model. If
+    # @param data_file_path [String, Pathname] Path to a YAML, JSON, or CSV file containing data for this model. If
     #   the path is a relative path, then it will be resolved from the either the default directory set for
     #   this model or the global directory set with SupportTableData.data_directory.
     # @return [void]
@@ -92,18 +92,15 @@ module SupportTableData
 
     # Load the data for the support table from the data files.
     #
-    # @return [Hash<String, Hash>] Merged hash of all the support table data.
+    # @return [Array<Hash>] Merged array of all the support table data.
     def support_table_data
       @support_table_data_files ||= []
       data = {}
       key_attribute = (support_table_key_attribute || :id).to_s
 
       @support_table_data_files.each do |data_file_path|
-        file_data = File.read(data_file_path)
-        parsed_data = (data_file_path.downcase.end_with?(".json") ? JSON.parse(file_data) : YAML.safe_load(file_data))
-        parsed_data.each do |key_value, attributes|
-          key_value = key_value.to_s
-          attributes = attributes.merge(key_attribute => key_value)
+        support_table_parse_data_file(data_file_path).each do |attributes|
+          key_value = attributes[key_attribute].to_s
           existing = data[key_value]
           if existing
             existing.merge!(attributes)
@@ -113,7 +110,21 @@ module SupportTableData
         end
       end
 
-      data
+      data.values
+    end
+
+    # Return true if the instance has data being managed from a data file.
+    #
+    # @return [Boolean]
+    def protected_instance?(instance)
+      key_attribute = (support_table_key_attribute || :id).to_s
+
+      unless defined?(@protected_keys)
+        keys = support_table_data.collect { |attributes| attributes[key_attribute].to_s }
+        @protected_keys = keys
+      end
+
+      @protected_keys.include?(instance[key_attribute].to_s)
     end
 
     private
@@ -125,7 +136,7 @@ module SupportTableData
       except = Array(except).collect(&:to_s) if except
       defined_methods = methods.collect(&:to_s).to_set
 
-      support_table_data.each_value do |attributes|
+      support_table_data.each do |attributes|
         value = attributes[attribute_name]&.to_s
         next if value.blank?
 
@@ -138,6 +149,26 @@ module SupportTableData
         next if only && !only.include?(method_name) && !only.include?(value)
 
         yield method_name, value
+      end
+    end
+
+    def support_table_parse_data_file(file_path)
+      file_data = File.read(file_path)
+
+      extension = file_path.split(".").last&.downcase
+      case extension
+      when "json"
+        require "json" unless defined?(JSON)
+        JSON.parse(file_data)
+      when "csv"
+        require "csv" unless defined?(CSV)
+        data = []
+        CSV.new(file_data, headers: true) do |row|
+          data << row.to_h
+        end
+      else
+        require "yaml" unless defined?(YAML)
+        YAML.safe_load(file_data)
       end
     end
   end
@@ -168,5 +199,13 @@ module SupportTableData
         Rails.root.join("db", "support_tables").to_s
       end
     end
+  end
+
+  # Return true if this instance has data being managed from a data file. You can add validation
+  # logic using this information if you want prevent the application from updating protected instances.
+  #
+  # @return [Boolean]
+  def protected_instance?
+    self.class.protected_instance?(self)
   end
 end

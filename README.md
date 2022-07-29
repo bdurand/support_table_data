@@ -3,7 +3,7 @@
 [![Continuous Integration](https://github.com/bdurand/support_table_data/actions/workflows/continuous_integration.yml/badge.svg)](https://github.com/bdurand/support_table_data/actions/workflows/continuous_integration.yml)
 [![Ruby Style Guide](https://img.shields.io/badge/code_style-standard-brightgreen.svg)](https://github.com/testdouble/standard)
 
-This gem provides an mixin for ActiveRecord models for small support tables that allow you load data from YAML or JSON files. It is intended to solve issues with support tables that contain a small set of canonical data that must exist for your application to work. These are the types of things that blur the line between data and code. You'll often end up with constants and application logic based on specific values from the table.
+This gem provides an mixin for ActiveRecord models for support tables that allow you load data from YAML, JSON, or CSV files. It is intended to solve issues with support tables that contain a small set of canonical data that must exist for your application to work. These are the types of things that blur the line between data and code. You'll often end up with constants and application logic based on specific values from the table.
 
 ## Usage
 
@@ -18,15 +18,15 @@ end
 Now we may have code that needs to reference the status and make decisions based on it. This means that every environment must always have the exact same values in it. You can solve for that in with the gem by defining the data in a YAML file:
 
 ```yaml
-1:
+- id: 1
   name: Pending
   icon: :clock:
 
-2:
+- id: 2
   name: In Progress
   icon: :construction:
 
-3:
+- id: 3
   name: Completed
   icon: :heavy_check_mark:
 ```
@@ -54,7 +54,9 @@ end
 
 ### Specifying Data Files
 
-You use the `add_support_table_data` class method to add a data file path. This file must be either a YAML or JSON file that defines a Hash. The keys for the hash must be a value that uniquely identifies each row and which will never change. By default, this will be the row id. You can change this with the `support_table_key_attribute` class attribute.
+You use the `add_support_table_data` class method to add a data file path. This file must be either a YAML, JSON, or CSV file that defines a list of attributes. YAML and JSON files must be an array where each element is a hash of the attributes that should be set. CSV files must use comma delimiters and double quotes as the quote characters and must have a header row with the attribute names.
+
+There must be an attribute that uniquely identifies in each element that will never change. By default, this will be the row id. You can change this with the `support_table_key_attribute` class attribute.
 
 Relative paths to data files will be located from the value set in the class with the `support_table_data_directory` class attribute. If this value is not set, the global value set in `SupportTableData.data_directory` will be used. Otherwise, the path will be resolved relative to the current working directory. In a Rails application, the `SupportTableData.data_directory` will be automatically set to `db/support_tables/`. Note that the search directories must be set before loading your model classes.
 
@@ -67,6 +69,8 @@ Status.sync_table_data!
 ```
 
 This will add any missing records to the table and update the attributes of any records that don't match the values in the data files. Records that do not appear in the data files will not be touched. Any attributes not specified in the data files will not be changed.
+
+The number of rows coming from data files should be fairly small since they will all need to be loaded in to memory. It is possible to load just a handful of rows in a large table since rows not included in the data files will not be synced.
 
 ### Helper Methods
 

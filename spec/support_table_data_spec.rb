@@ -6,12 +6,13 @@ describe SupportTableData do
   let(:red) { Color.find_by(name: "Red") }
   let(:green) { Color.find_by(name: "Green") }
   let(:blue) { Color.find_by(name: "Blue") }
+  let(:yellow) { Color.find_by(name: "Yellow") }
   let(:purple) { Color.find_by(name: "Purple") }
   let(:light_gray) { Color.find_by(name: "Light Gray") }
   let(:dark_gray) { Color.find_by(name: "Dark Gray") }
 
   describe "sync_table_data!" do
-    it "loads data from YAML and JSON files" do
+    it "loads data from YAML, JSON, or CSV files" do
       Color.sync_table_data!
 
       expect(red.id).to eq 1
@@ -22,6 +23,9 @@ describe SupportTableData do
 
       expect(blue.id).to eq 3
       expect(blue.value).to eq 0x0000FF
+
+      expect(yellow.id).to eq 11
+      expect(yellow.value).to eq 0xFFFF00
     end
 
     it "updates existing data from the values in the data files" do
@@ -75,6 +79,20 @@ describe SupportTableData do
     it "can limit what methods get defined" do
       expect(Color.new.respond_to?(:light_gray?)).to eq true
       expect(Color.new.respond_to?(:purple?)).to eq false
+    end
+  end
+
+  describe "protected_instance?" do
+    it "returns true if the instance came from a data file" do
+      red = Color.new
+      red.id = 1
+      orange = Color.new
+      orange.id = 11
+      brown = Color.new
+      brown.id = 50
+      expect(red.protected_instance?).to eq true
+      expect(orange.protected_instance?).to eq true
+      expect(brown.protected_instance?).to eq false
     end
   end
 end
