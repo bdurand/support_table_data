@@ -78,7 +78,7 @@ Status.in_progress # Status.find_by(name: "In Progress")
 Status.completed # Status.find_by(name: "Completed")
 ```
 
-You can use `` to define predicate methods that test the attribute for a specific value. In our example, there would be three instance methods:
+You can use `define_predicates_from` to define predicate methods that test the attribute for a specific value. In our example, there would be three instance methods:
 
 ```ruby
 status.pending? # status.name == "Pending"
