@@ -31,8 +31,6 @@ module SupportTableData
       end
     end
 
-    protected
-
     # Add a data file the contains the support table data. This method can be called multiple times to
     # load data from multiple files.
     #
@@ -137,8 +135,6 @@ module SupportTableData
   end
 
   included do
-    protected
-
     # Define the attribute used as the key of the hash in the data files.
     # This should be a value that never changes. By default the key attribute will be the id.
     class_attribute :support_table_key_attribute, instance_accessor: false
