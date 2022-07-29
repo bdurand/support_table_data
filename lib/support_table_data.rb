@@ -21,13 +21,21 @@ module SupportTableData
     # @return [void]
     def sync_table_data!
       key_attribute = (support_table_key_attribute || :id).to_s
-      support_table_data.each do |attributes|
-        key = attributes[key_attribute]
-        record = find_or_initialize_by(key_attribute => key)
+      canonical_data = support_table_data
+      records = where(key_attribute => canonical_data.keys)
+
+      records.each do |record|
+        key = record[key_attribute].to_s
+        record.attributes = canonical_data.delete(key)
+        record.save! if record.changed?
+      end
+
+      canonical_data.each_value do |attributes|
+        record = new
         attributes.each do |name, val|
           record.send("#{name}=", val) if record.respond_to?("#{name}=")
         end
-        record.save! if record.changed?
+        record.save!
       end
     end
 
@@ -84,7 +92,7 @@ module SupportTableData
 
     # Load the data for the support table from the data files.
     #
-    # @return [Array<Hash>] Array of attributes for each row.
+    # @return [Hash<Hash>] Merged hash of all the support table data.
     def support_table_data
       @support_table_data_files ||= []
       data = {}
@@ -105,7 +113,7 @@ module SupportTableData
         end
       end
 
-      data.values
+      data
     end
 
     private
@@ -117,7 +125,7 @@ module SupportTableData
       except = Array(except).collect(&:to_s) if except
       defined_methods = methods.collect(&:to_s).to_set
 
-      support_table_data.each do |attributes|
+      support_table_data.each_value do |attributes|
         value = attributes[attribute_name]&.to_s
         next if value.blank?
 
