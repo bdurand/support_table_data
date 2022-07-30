@@ -66,6 +66,10 @@ describe SupportTableData do
       expect(Color.respond_to?(:light_gray)).to eq true
       expect(Color.respond_to?(:purple)).to eq false
     end
+
+    it "raises an error if the instance doesn't exist" do
+      expect { Color.red }.to raise_error(ActiveRecord::RecordNotFound)
+    end
   end
 
   describe "define_predicates_from" do
