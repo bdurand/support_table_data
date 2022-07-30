@@ -84,7 +84,7 @@ module SupportTableData
       support_table_define_methods(attribute_name, only, except, false, methods + private_methods) do |method_name, value|
         class_eval <<~RUBY, __FILE__, __LINE__ + 1
           def self.#{method_name}
-            find_by(#{attribute_name}: #{value.inspect})
+            find_by!(#{attribute_name}: #{value.inspect})
           end
         RUBY
       end
