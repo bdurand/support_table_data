@@ -3,7 +3,9 @@
 [![Continuous Integration](https://github.com/bdurand/support_table_data/actions/workflows/continuous_integration.yml/badge.svg)](https://github.com/bdurand/support_table_data/actions/workflows/continuous_integration.yml)
 [![Ruby Style Guide](https://img.shields.io/badge/code_style-standard-brightgreen.svg)](https://github.com/testdouble/standard)
 
-This gem provides an mixin for ActiveRecord models for support tables that allow you load data from YAML, JSON, or CSV files. It is intended to solve issues with support tables that contain a small set of canonical data that must exist for your application to work. These are the types of things that blur the line between data and code. You'll often end up with constants and application logic based on specific values from the table.
+This gem provides an mixin for ActiveRecord models for support tables that allow you load data from YAML, JSON, or CSV files. It is intended to solve issues with support tables that contain a small set of canonical data that must exist for your application to work.
+
+These kinds of models blur the line between data and code. You'll often end up with constants and application logic based on specific values from the table. By using this gem, you can design a more consitent data model and use objects rather than defining constants with magic values.
 
 ## Usage
 
@@ -99,7 +101,34 @@ You can control which helper methods are defined by adding the `only` or `except
 
 ### Caching
 
-You can use the companion [support_table_cache gem](https://github.com/bdurand/support_table_cache) to add caching support to your models so that you don't need to constantly query the database for records that will never change.
+You can use the companion [support_table_cache gem](https://github.com/bdurand/support_table_cache) to add caching support to your models so that you don't need to constantly query the database for records that will never change. If you have a small table with a few dozen static rows, you should consider caching the values in memory.
+
+```
+class Status < ApplicationRecord
+  include SupportTableData
+  include SupportTableCache
+
+  add_support_table_data "statuses.yml"
+
+  # Define instance and predicate methods for each name value.
+  define_instances_from :name
+  define_predicates_from :name
+
+  # Cache lookups for finding by name or id.
+  cache_by :name
+  cache_by :id
+
+  # Cache records in local memory instead of a shared cache.
+  self.support_table_cache = :memory
+end
+
+class Thing < ApplicationRecord
+  belongs_to :status
+
+  # Use caching to load the association rather than hitting the database every time.
+  cache_belongs_to :status
+end
+```
 
 ## Installation
 
