@@ -25,6 +25,8 @@ class Color < ActiveRecord::Base
   define_instances_from :name, only: [:red, :green, :blue, :dark_gray, "Light Gray"]
   define_predicates_from :name, except: "purple?"
 
+  private
+
   def hex=(value)
     self.value = value.to_i(16)
   end

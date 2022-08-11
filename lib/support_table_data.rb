@@ -25,7 +25,7 @@ module SupportTableData
         key = record[key_attribute].to_s
         attributes = canonical_data.delete(key)
         attributes&.each do |name, value|
-          record.send("#{name}=", value)
+          record.send("#{name}=", value) if record.respond_to?("#{name}=", true)
         end
         record.save! if record.changed?
       end
@@ -33,7 +33,7 @@ module SupportTableData
       canonical_data.each_value do |attributes|
         record = new
         attributes.each do |name, val|
-          record.send("#{name}=", val) if record.respond_to?("#{name}=")
+          record.send("#{name}=", val) if record.respond_to?("#{name}=", true)
         end
         record.save!
       end
@@ -88,6 +88,18 @@ module SupportTableData
           end
         RUBY
       end
+    end
+
+    # Helper method to define both instance and predicate methods from the same attribute and with
+    # the same only or except filters.
+    #
+    # @param attribute_name [String, Symbol] The name of the attribute to use to define the methods.
+    # @param only [Array<Symbol, String>, Symbol, String] List of the only methods to create.
+    # @param except [Array<Symbol, String>, Symbol, String] List of the methods not to create.
+    # @return [void]
+    def define_instances_and_predicates_from(attribute_name, only: nil, except: nil)
+      define_instances_from(attribute_name, only: only, except: except)
+      define_predicates_from(attribute_name, only: only, except: except)
     end
 
     # Load the data for the support table from the data files.
