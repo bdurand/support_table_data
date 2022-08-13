@@ -45,12 +45,6 @@ class Status < ApplicationRecord
 
   # Add a data file; you can also specify an absolute path. You can add multiple data files.
   add_support_table_data "statuses.yml"
-
-  # Define instance reader methods for each name value.
-  define_instances_from :name
-
-  # Define predicate methods for each name value.
-  define_predicates_from :name
 end
 ```
 
@@ -76,27 +70,49 @@ The number of rows coming from data files should be fairly small since they will
 
 ### Helper Methods
 
-You can use the `define_instances_from` to define helper methods on your class based on attribute values. In our example, there would be three class methods defined to load records by name
+You can automatically defined helper methods to load and test instances. This allows you to add more natural ways of referencing specific records.
 
-```ruby
-Status.pending # Status.find_by(name: "Pending")
-Status.in_progress # Status.find_by(name: "In Progress")
-Status.completed # Status.find_by(name: "Completed")
+Helper methods are defined if you supply a hash instead of an array in the data files. The hash keys must be a valid Ruby method name. Keys that begin with and underscore will not be used to generate helper methods. If you only want to only create helpers on a few instances, you can add them in an array under an underscored key.
+
+```yaml
+pending:
+  id: 1
+  name: Pending
+  icon: :clock:
+
+in_progress:
+  id: 2
+  name: In Progress
+  icon: :construction:
+
+completed:
+  id: 3
+  name: Completed
+  icon: :heavy_check_mark:
+
+_others:
+  - id: 4
+    name: Draft
+
+  - id: 5
+    name: Deleted
 ```
 
-You can use `define_predicates_from` to define predicate methods that test the attribute for a specific value. In our example, there would be three instance methods:
+The hash keys will be used to define helper methods to load and test records. In this example, our model would define these methods to load and test records.
 
 ```ruby
+Status.pending # Status.find_by!(name: "Pending")
+Status.in_progress # Status.find_by!(name: "In Progress")
+Status.completed # Status.find_by!(name: "Completed")
+
 status.pending? # status.name == "Pending"
 status.in_progress? # status.name == "In Progress"
 status.completed? # status.name == "Completed"
 ```
 
-You can control which helper methods are defined by adding the `only` or `except` argument,
+Helper methods will not override already defined methods on a model class. Any name prefixed with an underscore will also not be defined as a helper method. You can use this feature if you only want to define helper methods for a few specific values. You could then add the other values in an array under the `_` key.
 
-```
-  define_instances_from :name, only: [:in_progress, :completed]
-  define_predicates_from :name, except: [:pending?]
+```yaml
 ```
 
 ### Caching
@@ -109,10 +125,6 @@ class Status < ApplicationRecord
   include SupportTableCache
 
   add_support_table_data "statuses.yml"
-
-  # Define instance and predicate methods for each name value.
-  define_instances_from :name
-  define_predicates_from :name
 
   # Cache lookups for finding by name or id.
   cache_by :name

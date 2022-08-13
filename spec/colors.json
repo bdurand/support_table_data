@@ -1,10 +1,5 @@
 [
   {
-    "id": 2,
-    "name": "Green",
-    "hex": "0x00FF00"
-  },
-  {
     "id": 8,
     "name": "Light Gray",
     "hex": "0xCCCCCC"

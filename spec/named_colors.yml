@@ -1,0 +1,18 @@
+red:
+  id: 1
+  name: Red
+  hex: "0xFF0000"
+
+blue:
+  id: 3
+  name: Blue
+  hex: "0x0000FF"
+
+_others:
+  - id: 12
+    name: Medium Gray
+    hex: "0x666666"
+
+  - id: 14
+    name: White
+    hex: "0xFFFFFF"
