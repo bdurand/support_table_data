@@ -147,7 +147,7 @@ module SupportTableData
     end
 
     def define_support_table_predicates_helper(method_name, attribute_name, attribute_value)
-      if method_defined?(method_name, true) || private_method_defined?(method_name, true)
+      if method_defined?(method_name) || private_method_defined?(method_name)
         raise ArgumentError.new("Could not define support table helper method #{name}##{method_name} because it is already a defined method")
       end
 
