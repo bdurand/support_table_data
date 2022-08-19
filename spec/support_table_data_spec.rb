@@ -58,7 +58,7 @@ describe SupportTableData do
     end
   end
 
-  describe "helper methods" do
+  describe "named instances" do
     it "defines class methods to load records by a column value" do
       Color.sync_table_data!
       expect(Color.red).to eq red
@@ -78,6 +78,12 @@ describe SupportTableData do
     it "does not define helper methods when the name begins with an underscore" do
       expect(Color.respond_to?(:_)).to eq false
       expect(red.respond_to?(:_?)).to eq false
+    end
+  end
+
+  describe "instance_names" do
+    it "keeps a list of instance names" do
+      expect(Color.instance_names).to match_array ["black", "blue", "red", "green"]
     end
   end
 

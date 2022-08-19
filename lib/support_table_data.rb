@@ -50,7 +50,7 @@ module SupportTableData
       @support_table_data_files ||= []
       root_dir = (support_table_data_directory || SupportTableData.data_directory || Dir.pwd)
       @support_table_data_files << File.expand_path(data_file_path, root_dir)
-      define_support_table_helper_methods
+      define_support_table_named_instances
     end
 
     # Load the data for the support table from the data files.
@@ -79,6 +79,14 @@ module SupportTableData
       data.values
     end
 
+    # Get the names for all named instances.
+    #
+    # @return [Array<String>]
+    def instance_names
+      @support_table_instance_names ||= Set.new
+      @support_table_instance_names.to_a
+    end
+
     # Return true if the instance has data being managed from a data file.
     #
     # @return [Boolean]
@@ -95,22 +103,32 @@ module SupportTableData
 
     private
 
-    def define_support_table_helper_methods
+    def define_support_table_named_instances
       @support_table_data_files ||= []
+      @support_table_instance_names ||= Set.new
       key_attribute = (support_table_key_attribute || :id).to_s
 
       @support_table_data_files.each do |file_path|
         data = support_table_parse_data_file(file_path)
         if data.is_a?(Hash)
           data.each do |key, attributes|
-            next unless attributes.is_a?(Hash)
+            method_name = key.to_s.freeze
+            next if method_name.start_with?("_")
 
-            method_name = key.to_s
-            next unless method_name.match?(/\A[a-z][a-z0-9_]+\z/)
+            unless attributes.is_a?(Hash)
+              raise ArgumentError.new("Cannot define named instance #{method_name} on #{name}; value must be a Hash")
+            end
 
-            key_value = attributes[key_attribute]
-            define_support_table_instance_helper(method_name, key_attribute, key_value)
-            define_support_table_predicates_helper("#{method_name}?", key_attribute, key_value)
+            unless method_name.match?(/\A[a-z][a-z0-9_]+\z/)
+              raise ArgumentError.new("Cannot define named instance #{method_name} on #{name}; name contains illegal characters")
+            end
+
+            unless @support_table_instance_names.include?(method_name)
+              @support_table_instance_names << method_name
+              key_value = attributes[key_attribute]
+              define_support_table_instance_helper(method_name, key_attribute, key_value)
+              define_support_table_predicates_helper("#{method_name}?", key_attribute, key_value)
+            end
           end
         end
       end
@@ -118,10 +136,7 @@ module SupportTableData
 
     def define_support_table_instance_helper(method_name, attribute_name, attribute_value)
       if respond_to?(method_name, true)
-        unless support_table_helper_method?(method(method_name))
-          raise ArgumentError.new("Could not define support table helper method #{name}.#{method_name} because it is already a defined method")
-        end
-        return
+        raise ArgumentError.new("Could not define support table helper method #{name}.#{method_name} because it is already a defined method")
       end
 
       class_eval <<~RUBY, __FILE__, __LINE__ + 1
@@ -133,10 +148,7 @@ module SupportTableData
 
     def define_support_table_predicates_helper(method_name, attribute_name, attribute_value)
       if method_defined?(method_name, true) || private_method_defined?(method_name, true)
-        unless support_table_helper_method?(instance_method(method_name))
-          raise ArgumentError.new("Could not define support table helper method #{name}##{method_name} because it is already a defined method")
-        end
-        return
+        raise ArgumentError.new("Could not define support table helper method #{name}##{method_name} because it is already a defined method")
       end
 
       class_eval <<~RUBY, __FILE__, __LINE__ + 1
@@ -167,10 +179,6 @@ module SupportTableData
       end
 
       data
-    end
-
-    def support_table_helper_method?(method)
-      method.source_location.any? { |line| line.start_with?(__FILE__) }
     end
   end
 
