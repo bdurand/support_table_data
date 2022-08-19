@@ -87,6 +87,24 @@ module SupportTableData
       @support_table_instance_names.to_a
     end
 
+    # Get the key values for all instances loaded from data files.
+    #
+    # @return [Array]
+    def instance_keys
+      unless defined?(@support_table_instance_keys)
+        key_attribute = (support_table_key_attribute || :id).to_s
+        values = []
+        support_table_data.each do |attributes|
+          key_value = attributes[key_attribute]
+          instance = new
+          instance.send("#{key_attribute}=", key_value)
+          values << instance.send(key_attribute)
+        end
+        @support_table_instance_keys = values.uniq
+      end
+      @support_table_instance_keys
+    end
+
     # Return true if the instance has data being managed from a data file.
     #
     # @return [Boolean]
