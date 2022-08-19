@@ -82,8 +82,14 @@ describe SupportTableData do
   end
 
   describe "instance_names" do
-    it "keeps a list of instance names" do
+    it "gets a list of instance names" do
       expect(Color.instance_names).to match_array ["black", "blue", "red", "green"]
+    end
+  end
+
+  describe "instance_keys" do
+    it "gets a list of key attribute values for all instances" do
+      expect(Color.instance_keys).to match_array [1, 3, 12, 14, 2, 13, 4, 9, 8, 10, 11]
     end
   end
 
