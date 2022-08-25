@@ -50,56 +50,7 @@ module SupportTableData
       @support_table_data_files ||= []
       root_dir = (support_table_data_directory || SupportTableData.data_directory || Dir.pwd)
       @support_table_data_files << File.expand_path(data_file_path, root_dir)
-    end
-
-    # Generate predicate methods based on the specified attribute name. A method will be defined
-    # for each record in the support table data. The method name will be based on underscored
-    # versions of the attribute value (i.e. "Dark Gray" would define the method `dark_gray?`).
-    # The generated methods will return true if the attribute is equal to the value.
-    #
-    # @param attribute_name [String, Symbol] The name of the attribute to use to define the methods.
-    # @param only [Array<Symbol, String>, Symbol, String] List of the only methods to create.
-    # @param except [Array<Symbol, String>, Symbol, String] List of the methods not to create.
-    # @return [void]
-    def define_predicates_from(attribute_name, only: nil, except: nil)
-      support_table_define_methods(attribute_name, only, except, true, instance_methods + private_instance_methods) do |method_name, value|
-        class_eval <<~RUBY, __FILE__, __LINE__ + 1
-          def #{method_name}
-            #{attribute_name} == #{value.inspect}
-          end
-        RUBY
-      end
-    end
-
-    # Generate singleton methods based on the specified attribute name. A method will be defined
-    # for each record in the support table data. The method name will be based on underscored
-    # versions of the the attribute value (i.e. "Dark Gray" would define the class method `dark_gray`)
-    # and will return the record with the attribute equal to the value.
-    #
-    # @param attribute_name [String, Symbol] The name of the attribute to use to define the methods.
-    # @param only [Array<Symbol, String>, Symbol, String] List of the only methods to create.
-    # @param except [Array<Symbol, String>, Symbol, String] List of the methods not to create.
-    # @return [void]
-    def define_instances_from(attribute_name, only: nil, except: nil)
-      support_table_define_methods(attribute_name, only, except, false, methods + private_methods) do |method_name, value|
-        class_eval <<~RUBY, __FILE__, __LINE__ + 1
-          def self.#{method_name}
-            find_by!(#{attribute_name}: #{value.inspect})
-          end
-        RUBY
-      end
-    end
-
-    # Helper method to define both instance and predicate methods from the same attribute and with
-    # the same only or except filters.
-    #
-    # @param attribute_name [String, Symbol] The name of the attribute to use to define the methods.
-    # @param only [Array<Symbol, String>, Symbol, String] List of the only methods to create.
-    # @param except [Array<Symbol, String>, Symbol, String] List of the methods not to create.
-    # @return [void]
-    def define_instances_and_predicates_from(attribute_name, only: nil, except: nil)
-      define_instances_from(attribute_name, only: only, except: except)
-      define_predicates_from(attribute_name, only: only, except: except)
+      define_support_table_named_instances
     end
 
     # Load the data for the support table from the data files.
@@ -111,7 +62,10 @@ module SupportTableData
       key_attribute = (support_table_key_attribute || :id).to_s
 
       @support_table_data_files.each do |data_file_path|
-        support_table_parse_data_file(data_file_path).each do |attributes|
+        file_data = support_table_parse_data_file(data_file_path)
+        file_data = file_data.values if file_data.is_a?(Hash)
+        file_data = Array(file_data).flatten
+        file_data.each do |attributes|
           key_value = attributes[key_attribute].to_s
           existing = data[key_value]
           if existing
@@ -123,6 +77,32 @@ module SupportTableData
       end
 
       data.values
+    end
+
+    # Get the names for all named instances.
+    #
+    # @return [Array<String>]
+    def instance_names
+      @support_table_instance_names ||= Set.new
+      @support_table_instance_names.to_a
+    end
+
+    # Get the key values for all instances loaded from data files.
+    #
+    # @return [Array]
+    def instance_keys
+      unless defined?(@support_table_instance_keys)
+        key_attribute = (support_table_key_attribute || :id).to_s
+        values = []
+        support_table_data.each do |attributes|
+          key_value = attributes[key_attribute]
+          instance = new
+          instance.send("#{key_attribute}=", key_value)
+          values << instance.send(key_attribute)
+        end
+        @support_table_instance_keys = values.uniq
+      end
+      @support_table_instance_keys
     end
 
     # Return true if the instance has data being managed from a data file.
@@ -141,47 +121,82 @@ module SupportTableData
 
     private
 
-    # Iterate values to define helper methods.
-    def support_table_define_methods(attribute_name, only, except, predicate, methods)
-      attribute_name = attribute_name.to_s
-      only = Array(only).collect(&:to_s) if only
-      except = Array(except).collect(&:to_s) if except
-      defined_methods = methods.collect(&:to_s).to_set
+    def define_support_table_named_instances
+      @support_table_data_files ||= []
+      @support_table_instance_names ||= Set.new
+      key_attribute = (support_table_key_attribute || :id).to_s
 
-      support_table_data.each do |attributes|
-        value = attributes[attribute_name]&.to_s
-        next if value.blank?
+      @support_table_data_files.each do |file_path|
+        data = support_table_parse_data_file(file_path)
+        if data.is_a?(Hash)
+          data.each do |key, attributes|
+            method_name = key.to_s.freeze
+            next if method_name.start_with?("_")
 
-        method_name = value.to_s.downcase.gsub(/[^a-z0-9_]+/, "_")
-        method_name = "_#{method_name}" unless /\A[a-z_]/.match?(method_name)
-        method_name = "#{method_name}?" if predicate
-        next if defined_methods.include?(method_name)
+            unless attributes.is_a?(Hash)
+              raise ArgumentError.new("Cannot define named instance #{method_name} on #{name}; value must be a Hash")
+            end
 
-        next if except && (except.include?(method_name) || except.include?(value))
-        next if only && !only.include?(method_name) && !only.include?(value)
+            unless method_name.match?(/\A[a-z][a-z0-9_]+\z/)
+              raise ArgumentError.new("Cannot define named instance #{method_name} on #{name}; name contains illegal characters")
+            end
 
-        yield method_name, value
+            unless @support_table_instance_names.include?(method_name)
+              @support_table_instance_names << method_name
+              key_value = attributes[key_attribute]
+              define_support_table_instance_helper(method_name, key_attribute, key_value)
+              define_support_table_predicates_helper("#{method_name}?", key_attribute, key_value)
+            end
+          end
+        end
       end
+    end
+
+    def define_support_table_instance_helper(method_name, attribute_name, attribute_value)
+      if respond_to?(method_name, true)
+        raise ArgumentError.new("Could not define support table helper method #{name}.#{method_name} because it is already a defined method")
+      end
+
+      class_eval <<~RUBY, __FILE__, __LINE__ + 1
+        def self.#{method_name}
+          find_by!(#{attribute_name}: #{attribute_value.inspect})
+        end
+      RUBY
+    end
+
+    def define_support_table_predicates_helper(method_name, attribute_name, attribute_value)
+      if method_defined?(method_name) || private_method_defined?(method_name)
+        raise ArgumentError.new("Could not define support table helper method #{name}##{method_name} because it is already a defined method")
+      end
+
+      class_eval <<~RUBY, __FILE__, __LINE__ + 1
+        def #{method_name}
+          #{attribute_name} == #{attribute_value.inspect}
+        end
+      RUBY
     end
 
     def support_table_parse_data_file(file_path)
       file_data = File.read(file_path)
 
       extension = file_path.split(".").last&.downcase
+      data = []
+
       case extension
       when "json"
         require "json" unless defined?(JSON)
-        JSON.parse(file_data)
+        data = JSON.parse(file_data)
       when "csv"
         require "csv" unless defined?(CSV)
-        data = []
-        CSV.new(file_data, headers: true) do |row|
+        CSV.new(file_data, headers: true).each do |row|
           data << row.to_h
         end
       else
         require "yaml" unless defined?(YAML)
-        YAML.safe_load(file_data)
+        data = YAML.safe_load(file_data)
       end
+
+      data
     end
   end
 

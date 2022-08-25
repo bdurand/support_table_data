@@ -18,12 +18,11 @@ class Color < ActiveRecord::Base
   include SupportTableData
 
   self.support_table_data_directory = __dir__
+  add_support_table_data "named_colors.yml"
+  add_support_table_data "named_colors.json"
   add_support_table_data "colors.yml"
   add_support_table_data File.join(__dir__, "colors.json")
   add_support_table_data "colors.csv"
-
-  define_instances_from :name, only: [:red, :green, :blue, :dark_gray, "Light Gray"]
-  define_predicates_from :name, except: "purple?"
 
   private
 

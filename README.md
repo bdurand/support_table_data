@@ -3,9 +3,9 @@
 [![Continuous Integration](https://github.com/bdurand/support_table_data/actions/workflows/continuous_integration.yml/badge.svg)](https://github.com/bdurand/support_table_data/actions/workflows/continuous_integration.yml)
 [![Ruby Style Guide](https://img.shields.io/badge/code_style-standard-brightgreen.svg)](https://github.com/testdouble/standard)
 
-This gem provides an mixin for ActiveRecord models for support tables that allow you load data from YAML, JSON, or CSV files. It is intended to solve issues with support tables that contain a small set of canonical data that must exist for your application to work.
+This gem provides an mixin for ActiveRecord models for support tables that allow you load data from YAML, JSON, or CSV files. It is intended to solve issues with support tables (also known as lookup tables) that contain a small set of canonical data that must exist for your application to work.
 
-These kinds of models blur the line between data and code. You'll often end up with constants and application logic based on specific values from the table. By using this gem, you can design a more consitent data model and use objects rather than defining constants with magic values.
+These kinds of models blur the line between data and code. You'll often end up with constants and application logic based on specific values from the table. By using this gem, you can easily define methods for loading and comparing specific instances. This can really help clean up your code, make it read far more naturally, and prevent you from having to define dozens of constants or reference magic values.
 
 ## Usage
 
@@ -33,8 +33,7 @@ Now we may have code that needs to reference the status and make decisions based
   icon: :heavy_check_mark:
 ```
 
-You can then use this mixin to tell your model what data it should have in it and to use that data
-to define helper methods:
+You can then use this mixin to match that data with your model:
 
 ```ruby
 class Status < ApplicationRecord
@@ -45,22 +44,16 @@ class Status < ApplicationRecord
 
   # Add a data file; you can also specify an absolute path. You can add multiple data files.
   add_support_table_data "statuses.yml"
-
-  # Define instance reader methods for each name value.
-  define_instances_from :name
-
-  # Define predicate methods for each name value.
-  define_predicates_from :name
 end
 ```
 
 ### Specifying Data Files
 
-You use the `add_support_table_data` class method to add a data file path. This file must be either a YAML, JSON, or CSV file that defines a list of attributes. YAML and JSON files must be an array where each element is a hash of the attributes that should be set. CSV files must use comma delimiters and double quotes as the quote characters and must have a header row with the attribute names.
+You use the `add_support_table_data` class method to add a data file path. This file must be either a YAML, JSON, or CSV file that defines a list of attributes. YAML and JSON files must be an array where each element is a hash of the attributes that should be set. CSV files must use comma delimiters, double quotes as the quote characters, and must have a header row with the attribute names.
 
-There must be an attribute that uniquely identifies in each element that will never change. By default, this will be the row id. You can change this with the `support_table_key_attribute` class attribute.
+There must be an attribute that uniquely identifies in each element that will never change. By default, this will be the row id. You can change this with the `support_table_key_attribute` class attribute. This attribute is used to identify each row and match it with the data in the file. You cannot change a key attribute. If you do, a new record will be created with that key attribute an the existing row with the old will be left in the table. If you don't use the id as the key attribute, you don't need to include the ids in the data file.
 
-Relative paths to data files will be located from the value set in the class with the `support_table_data_directory` class attribute. If this value is not set, the global value set in `SupportTableData.data_directory` will be used. Otherwise, the path will be resolved relative to the current working directory. In a Rails application, the `SupportTableData.data_directory` will be automatically set to `db/support_tables/`. Note that the search directories must be set before loading your model classes.
+You can specify data files as relative paths. If you do, they will be located from the value set in the class with the `support_table_data_directory` class attribute. If this value is not set, the global value set in `SupportTableData.data_directory` will be used. Otherwise, the path will be resolved relative to the current working directory. In a Rails application, the `SupportTableData.data_directory` will be automatically set to `db/support_tables/`. The directory to load relative files from must be set before loading your model classes.
 
 ### Loading Data
 
@@ -72,32 +65,55 @@ Status.sync_table_data!
 
 This will add any missing records to the table and update the attributes of any records that don't match the values in the data files. Records that do not appear in the data files will not be touched. Any attributes not specified in the data files will not be changed.
 
-The number of rows coming from data files should be fairly small since they will all need to be loaded in to memory. It is possible to load just a handful of rows in a large table since rows not included in the data files will not be synced.
+The number of rows coming from data files should be fairly small since they will all need to be loaded in to memory. It is possible to load just a handful of rows in a large table since only rows in the data files will be synced. You could use this feature if your table allows user entered values, but has a few rows that have to exist. Attributes not specified in the data files will also be left alone and not be synced.
 
-### Helper Methods
+You should also include a call to sync support tables in your environment bootstrap scripts (i.e. `bin/update` in a Rails application) or mechanism used to seed the database.
 
-You can use the `define_instances_from` to define helper methods on your class based on attribute values. In our example, there would be three class methods defined to load records by name
+### Named Instances
+
+You can also automatically defined helper methods to load and test instances. This allows you to add more natural ways of referencing specific records.
+
+Named instances are defined if you supply a hash instead of an array in the data files. The hash keys must be valid Ruby method names. Keys that begin with and underscore will not be used to generate named instances. If you only want to create named instances on a few rows in a table, you can add them in an array under an underscored key.
+
+Here is an example data file using named instances:
+
+```yaml
+pending:
+  id: 1
+  name: Pending
+  icon: :clock:
+
+in_progress:
+  id: 2
+  name: In Progress
+  icon: :construction:
+
+completed:
+  id: 3
+  name: Completed
+  icon: :heavy_check_mark:
+
+_others:
+  - id: 4
+    name: Draft
+
+  - id: 5
+    name: Deleted
+```
+
+The hash keys will be used to define helper methods to load and test records. In this example, our model would define these methods that can make it far more natural to reference specific instances.
 
 ```ruby
-Status.pending # Status.find_by(name: "Pending")
-Status.in_progress # Status.find_by(name: "In Progress")
-Status.completed # Status.find_by(name: "Completed")
+Status.pending      # Status.find_by!(id: 1)
+Status.in_progress  # Status.find_by!(id: 2)
+Status.completed    # Status.find_by!(id: 3)
+
+status.pending?     # status.id == 1
+status.in_progress? # status.id == 2
+status.completed?   # status.id == 3
 ```
 
-You can use `define_predicates_from` to define predicate methods that test the attribute for a specific value. In our example, there would be three instance methods:
-
-```ruby
-status.pending? # status.name == "Pending"
-status.in_progress? # status.name == "In Progress"
-status.completed? # status.name == "Completed"
-```
-
-You can control which helper methods are defined by adding the `only` or `except` argument,
-
-```
-  define_instances_from :name, only: [:in_progress, :completed]
-  define_predicates_from :name, except: [:pending?]
-```
+Helper methods will not override already defined methods on a model class. If a method is already defined, an `ArgumentError` will be raised.
 
 ### Caching
 
@@ -109,10 +125,6 @@ class Status < ApplicationRecord
   include SupportTableCache
 
   add_support_table_data "statuses.yml"
-
-  # Define instance and predicate methods for each name value.
-  define_instances_from :name
-  define_predicates_from :name
 
   # Cache lookups for finding by name or id.
   cache_by :name

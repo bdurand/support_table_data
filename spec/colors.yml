@@ -1,11 +1,3 @@
-- id: 1
-  name: Red
-  hex: "0xFF0000"
-
-- id: 3
-  name: Blue
-  hex: "0x0000FF"
-
 - id: 4
   name: Dark Gray
   hex: "0x333333"

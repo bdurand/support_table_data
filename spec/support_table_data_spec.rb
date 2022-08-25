@@ -10,6 +10,7 @@ describe SupportTableData do
   let(:purple) { Color.find_by(name: "Purple") }
   let(:light_gray) { Color.find_by(name: "Light Gray") }
   let(:dark_gray) { Color.find_by(name: "Dark Gray") }
+  let(:white) { Color.find_by(name: "White") }
 
   describe "sync_table_data!" do
     it "loads data from YAML, JSON, or CSV files" do
@@ -26,6 +27,9 @@ describe SupportTableData do
 
       expect(yellow.id).to eq 11
       expect(yellow.value).to eq 0xFFFF00
+
+      expect(white.id).to eq 14
+      expect(white.value).to eq 0xFFFFFF
     end
 
     it "updates existing data from the values in the data files" do
@@ -54,35 +58,38 @@ describe SupportTableData do
     end
   end
 
-  describe "define_instances_from" do
+  describe "named instances" do
     it "defines class methods to load records by a column value" do
       Color.sync_table_data!
       expect(Color.red).to eq red
-      expect(Color.light_gray).to eq light_gray
-      expect(Color.dark_gray).to eq dark_gray
-    end
-
-    it "can limit what methods get defined" do
-      expect(Color.respond_to?(:light_gray)).to eq true
-      expect(Color.respond_to?(:purple)).to eq false
+      expect(Color.blue).to eq blue
     end
 
     it "raises an error if the instance doesn't exist" do
       expect { Color.red }.to raise_error(ActiveRecord::RecordNotFound)
     end
-  end
 
-  describe "define_predicates_from" do
     it "defines predicate methods for comparing an attribute" do
       Color.sync_table_data!
       expect(red.red?).to eq true
-      expect(red.dark_gray?).to eq false
-      expect(dark_gray.dark_gray?).to eq true
+      expect(red.blue?).to eq false
     end
 
-    it "can limit what methods get defined" do
-      expect(Color.new.respond_to?(:light_gray?)).to eq true
-      expect(Color.new.respond_to?(:purple?)).to eq false
+    it "does not define helper methods when the name begins with an underscore" do
+      expect(Color.respond_to?(:_)).to eq false
+      expect(red.respond_to?(:_?)).to eq false
+    end
+  end
+
+  describe "instance_names" do
+    it "gets a list of instance names" do
+      expect(Color.instance_names).to match_array ["black", "blue", "red", "green"]
+    end
+  end
+
+  describe "instance_keys" do
+    it "gets a list of key attribute values for all instances" do
+      expect(Color.instance_keys).to match_array [1, 3, 12, 14, 2, 13, 4, 9, 8, 10, 11]
     end
   end
 

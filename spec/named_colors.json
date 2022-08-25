@@ -1,0 +1,12 @@
+{
+  "green": {
+    "id": 2,
+    "name": "Green",
+    "hex": "0x00FF00"
+  },
+  "black": {
+    "id": 13,
+    "name": "Black",
+    "hex": "0x000000"
+  }
+}
