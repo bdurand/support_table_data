@@ -2,17 +2,25 @@ red:
   id: 1
   name: Red
   hex: "0xFF0000"
+  group_name: primary
+  hue_name: red
 
 blue:
   id: 3
   name: Blue
   hex: "0x0000FF"
+  group_name: primary
+  hue_name: blue
 
 _others:
   - id: 12
     name: Medium Gray
     hex: "0x666666"
+    group_name: gray
+    hue_name: gray
 
   - id: 14
     name: White
     hex: "0xFFFFFF"
+    group_name: gray
+    hue_name: white

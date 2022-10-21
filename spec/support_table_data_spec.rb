@@ -14,7 +14,7 @@ describe SupportTableData do
 
   describe "sync_table_data!" do
     it "loads data from YAML, JSON, or CSV files" do
-      Color.sync_table_data!
+      SupportTableData.sync_all!
 
       expect(red.id).to eq 1
       expect(red.value).to eq 0xFF0000
@@ -36,7 +36,7 @@ describe SupportTableData do
       color = Color.new(name: "Pink", comment: "on the reddish side")
       color.id = 1
       color.save!
-      Color.sync_table_data!
+      SupportTableData.sync_all!
       color.reload
       expect(color.name).to eq "Red"
       expect(color.value).to eq 0xFF0000
@@ -47,12 +47,12 @@ describe SupportTableData do
       color = Color.new(name: "Pink")
       color.id = 10
       color.save!
-      Color.sync_table_data!
+      SupportTableData.sync_all!
       expect(Color.find_by(id: 10)).to eq color
     end
 
     it "combines data when a record is defined across multiple data files" do
-      Color.sync_table_data!
+      SupportTableData.sync_all!
       expect(purple.name).to eq "Purple"
       expect(purple.value).to eq 0x800080
     end
@@ -60,7 +60,7 @@ describe SupportTableData do
 
   describe "named instances" do
     it "defines class methods to load records by a column value" do
-      Color.sync_table_data!
+      SupportTableData.sync_all!
       expect(Color.red).to eq red
       expect(Color.blue).to eq blue
     end
@@ -70,7 +70,7 @@ describe SupportTableData do
     end
 
     it "defines predicate methods for comparing an attribute" do
-      Color.sync_table_data!
+      SupportTableData.sync_all!
       expect(red.red?).to eq true
       expect(red.blue?).to eq false
     end
@@ -104,6 +104,12 @@ describe SupportTableData do
       expect(red.protected_instance?).to eq true
       expect(orange.protected_instance?).to eq true
       expect(brown.protected_instance?).to eq false
+    end
+  end
+
+  describe "support_table_classes" do
+    it "gets a list of all loaded support table classes with belongs to dependencies listed first" do
+      expect(SupportTableData.support_table_classes).to eq [Group, Hue, Color]
     end
   end
 end

@@ -1,6 +1,8 @@
 - id: 4
   name: Dark Gray
   hex: "0x333333"
+  group_name: "gray"
+  hue_name: "gray"
 
 - id: 9
   name: Purple

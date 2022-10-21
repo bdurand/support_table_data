@@ -1,8 +1,7 @@
 # frozen_string_literal: true
 
-# This concern can be mixed into models that represent static support tables. These
-# would be small tables that have a limited number of rows and which have values that
-# are often tied into logic in the code.
+# This concern can be mixed into models that represent static support tables. These are small tables
+# that have a limited number of rows, and have values that are often tied to the logic in the code.
 #
 # The values that should be in support tables can be defined in YAML, JSON, or CSV files. These
 # values can then be synced to the database and helper methods can be generated from them.
@@ -14,35 +13,45 @@ module SupportTableData
     # `add_support_table_data`. Note that rows will not be deleted if they are no longer in
     # the data files. This method should normally be called from a database or seed migration.
     # You should create a new migration any time values in the data files are changed.
+    # TODO update docs
     #
-    # @return [void]
+    # @return [Array<Hash>] List of saved changes for each record that was created or modified.
     def sync_table_data!
       key_attribute = (support_table_key_attribute || :id).to_s
       canonical_data = support_table_data.each_with_object({}) { |attributes, hash| hash[attributes[key_attribute].to_s] = attributes }
       records = where(key_attribute => canonical_data.keys)
+      changes = []
 
-      records.each do |record|
-        key = record[key_attribute].to_s
-        attributes = canonical_data.delete(key)
-        attributes&.each do |name, value|
-          record.send("#{name}=", value) if record.respond_to?("#{name}=", true)
+      transaction do
+        records.each do |record|
+          key = record[key_attribute].to_s
+          attributes = canonical_data.delete(key)
+          attributes&.each do |name, value|
+            record.send("#{name}=", value) if record.respond_to?("#{name}=", true)
+          end
+          if record.changed?
+            record.save!
+            changes << record.saved_changes
+          end
         end
-        record.save! if record.changed?
+
+        canonical_data.each_value do |attributes|
+          record = new
+          attributes.each do |name, value|
+            record.send("#{name}=", value) if record.respond_to?("#{name}=", true)
+          end
+          record.save!
+          changes << record.saved_changes
+        end
       end
 
-      canonical_data.each_value do |attributes|
-        record = new
-        attributes.each do |name, val|
-          record.send("#{name}=", val) if record.respond_to?("#{name}=", true)
-        end
-        record.save!
-      end
+      changes
     end
 
-    # Add a data file the contains the support table data. This method can be called multiple times to
+    # Add a data file that contains the support table data. This method can be called multiple times to
     # load data from multiple files.
     #
-    # @param data_file_path [String, Pathname] Path to a YAML, JSON, or CSV file containing data for this model. If
+    # @param data_file_path [String, Pathname] The path to a YAML, JSON, or CSV file containing data for this model. If
     #   the path is a relative path, then it will be resolved from the either the default directory set for
     #   this model or the global directory set with SupportTableData.data_directory.
     # @return [void]
@@ -55,7 +64,7 @@ module SupportTableData
 
     # Load the data for the support table from the data files.
     #
-    # @return [Array<Hash>] Merged array of all the support table data.
+    # @return [Array<Hash>] A merged array of all the support table data.
     def support_table_data
       @support_table_data_files ||= []
       data = {}
@@ -87,7 +96,7 @@ module SupportTableData
       @support_table_instance_names.to_a
     end
 
-    # Get the key values for all instances loaded from data files.
+    # Get the key values for all instances loaded from the data files.
     #
     # @return [Array]
     def instance_keys
@@ -212,11 +221,11 @@ module SupportTableData
   end
 
   class << self
-    # Specify the directory where data files live by default.
+    # Specify the default directory for data files.
     attr_writer :data_directory
 
     # The directory where data files live by default. If you are running in a Rails environment,
-    # then this will be `db/support_tables`. Otherwise the current working directory will be used.
+    # then this will be `db/support_tables`. Otherwise, the current working directory will be used.
     #
     # @return [String]
     def data_directory
@@ -226,13 +235,73 @@ module SupportTableData
         Rails.root.join("db", "support_tables").to_s
       end
     end
+
+    # Sync all support table classes. Classes must already be loaded in order to be
+    # synced. If a block is supplied, it will be yielded to after each class is synced
+    # with the class and a list of changes that were made.
+    #
+    # @yieldparam [Class] The class that was just synchronized.
+    # @yieldparam [Array<Hash>] List of changes that were made to the table data.
+    def sync_all!(&block)
+      support_table_classes.each do |klass|
+        changes = klass.sync_table_data!
+        block&.call(klass, changes)
+      end
+    end
+
+    # Return the list of all support table classes in the order they should be loaded.
+    # Note that this method relies on the classes already having been loaded by the application
+    # and can return indeterminate results if eager loading is turned off (i.e. development mode
+    # in a Rails application).
+    #
+    # @return [Array<Class>] List of classes in the order they should be loaded.
+    def support_table_classes
+      classes = []
+      ActiveRecord::Base.descendants.sort_by(&:name).each do |klass|
+        next unless klass.include?(SupportTableData)
+        next if klass.abstract_class?
+        next if classes.include?(klass)
+        classes << klass
+      end
+
+      levels = [classes]
+      checked = Set.new
+      loop do
+        checked << classes
+        dependencies = classes.collect { |klass| support_table_dependencies(klass) }.flatten.uniq.sort_by(&:name)
+        break if dependencies.empty? || checked.include?(dependencies)
+        levels.unshift(dependencies)
+        classes = dependencies
+      end
+
+      levels.flatten.uniq
+    end
+
+    private
+
+    # Extract support table dependencies from the belongs to associations on a class.
+    #
+    # @return [Array<Class>]
+    def support_table_dependencies(klass)
+      dependencies = []
+      klass.reflections.values.select(&:belongs_to?).each do |reflection|
+        if reflection.klass.include?(SupportTableData) && !(reflection.klass <= klass)
+          dependencies << reflection.klass
+        end
+      end
+      dependencies
+    end
   end
 
   # Return true if this instance has data being managed from a data file. You can add validation
-  # logic using this information if you want prevent the application from updating protected instances.
+  # logic using this information if you want to prevent the application from updating protected instances.
   #
   # @return [Boolean]
   def protected_instance?
     self.class.protected_instance?(self)
   end
+end
+
+if defined?(Rails::Railtie)
+  require_relative "support_table_data/railtie"
 end

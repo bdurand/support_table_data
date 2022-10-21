@@ -1,0 +1,30 @@
+red:
+  name: red
+
+blue:
+  name: blue
+
+green:
+  name: green
+
+yellow:
+  name: yellow
+
+gray:
+  name: gray
+
+orange:
+  name: orange
+  parent_name: yellow
+
+purple:
+  name: purple
+  parent_name: blue
+
+black:
+  name: black
+  parent_name: gray
+
+white:
+  name: white
+  parent_name: gray

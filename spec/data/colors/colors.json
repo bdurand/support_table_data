@@ -1,0 +1,15 @@
+[
+  {
+    "id": 8,
+    "name": "Light Gray",
+    "hex": "0xCCCCCC",
+    "group_name": "gray",
+    "hue_name": "gray"
+  },
+  {
+    "id": 9,
+    "hex": "0x800080",
+    "group_name": "secondary",
+    "hue_name": "purple"
+  }
+]
