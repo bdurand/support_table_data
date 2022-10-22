@@ -26,7 +26,7 @@ namespace :support_table_data do
       end
     end
 
-    ActiveSupport::Notifications.subscribed(logger_callback, "support_table_data.sync", monotonic: true) do
+    ActiveSupport::Notifications.subscribed(logger_callback, "support_table_data.sync") do
       SupportTableData.sync_all!
     end
   end
