@@ -11,9 +11,7 @@ module SupportTableData
   module ClassMethods
     # Synchronize the rows in the table with the values defined in the data files added with
     # `add_support_table_data`. Note that rows will not be deleted if they are no longer in
-    # the data files. This method should normally be called from a database or seed migration.
-    # You should create a new migration any time values in the data files are changed.
-    # TODO update docs
+    # the data files.
     #
     # @return [Array<Hash>] List of saved changes for each record that was created or modified.
     def sync_table_data!
@@ -22,26 +20,28 @@ module SupportTableData
       records = where(key_attribute => canonical_data.keys)
       changes = []
 
-      transaction do
-        records.each do |record|
-          key = record[key_attribute].to_s
-          attributes = canonical_data.delete(key)
-          attributes&.each do |name, value|
-            record.send("#{name}=", value) if record.respond_to?("#{name}=", true)
+      ActiveSupport::Notifications.instrument("support_table_data.sync", class: self) do
+        transaction do
+          records.each do |record|
+            key = record[key_attribute].to_s
+            attributes = canonical_data.delete(key)
+            attributes&.each do |name, value|
+              record.send("#{name}=", value) if record.respond_to?("#{name}=", true)
+            end
+            if record.changed?
+              changes << record.changes
+              record.save!
+            end
           end
-          if record.changed?
-            record.save!
-            changes << record.saved_changes
-          end
-        end
 
-        canonical_data.each_value do |attributes|
-          record = new
-          attributes.each do |name, value|
-            record.send("#{name}=", value) if record.respond_to?("#{name}=", true)
+          canonical_data.each_value do |attributes|
+            record = new
+            attributes.each do |name, value|
+              record.send("#{name}=", value) if record.respond_to?("#{name}=", true)
+            end
+            changes << record.changes
+            record.save!
           end
-          record.save!
-          changes << record.saved_changes
         end
       end
 
@@ -240,13 +240,13 @@ module SupportTableData
     # synced. If a block is supplied, it will be yielded to after each class is synced
     # with the class and a list of changes that were made.
     #
-    # @yieldparam [Class] The class that was just synchronized.
-    # @yieldparam [Array<Hash>] List of changes that were made to the table data.
-    def sync_all!(&block)
+    # @return [Hash<Class, Array<Hash>] Hash of classes synced with a list of saved changes
+    def sync_all!
+      changes = {}
       support_table_classes.each do |klass|
-        changes = klass.sync_table_data!
-        block&.call(klass, changes)
+        changes[klass] = klass.sync_table_data!
       end
+      changes
     end
 
     # Return the list of all support table classes in the order they should be loaded.

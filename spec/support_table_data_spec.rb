@@ -56,6 +56,21 @@ describe SupportTableData do
       expect(purple.name).to eq "Purple"
       expect(purple.value).to eq 0x800080
     end
+
+    it "returns a list of changes" do
+      changes = Group.sync_table_data!
+      expect(changes).to eq([
+        {"id" => [nil, 1], "name" => [nil, "primary"]},
+        {"id" => [nil, 2], "name" => [nil, "secondary"]},
+        {"id" => [nil, 3], "name" => [nil, "gray"]}
+      ])
+      expect(Group.sync_table_data!).to eq([])
+
+      all_changes = SupportTableData.sync_all!
+      expect(all_changes[Group]).to eq([])
+      expect(all_changes[Hue]).to_not eq([])
+      expect(all_changes[Color]).to_not eq([])
+    end
   end
 
   describe "named instances" do

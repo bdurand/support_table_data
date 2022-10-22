@@ -15,8 +15,19 @@ namespace :support_table_data do
       end
     end
 
-    SupportTableData.sync_all! do |klass, changes|
-      puts "Synchronized support table data for #{klass.name}"
+    logger_callback = lambda do |name, started, finished, unique_id, payload|
+      klass = payload[:class]
+      elapsed_time = finished - started
+      message = "Synchronized support table model #{klass.name} in #{(elapsed_time * 1000).round}ms"
+      if klass.logger
+        klass.logger.info(message)
+      else
+        puts message
+      end
+    end
+
+    ActiveSupport::Notifications.subscribed(logger_callback, "support_table_data.sync", monotonic: true) do
+      SupportTableData.sync_all!
     end
   end
 end

@@ -52,12 +52,11 @@ class Group < ActiveRecord::Base
   unless table_exists?
     connection.create_table(table_name) do |t|
       t.string :name, index: {unique: true}
+      t.timestamps
     end
   end
 
   include SupportTableData
-
-  self.support_table_key_attribute = "name"
 
   add_support_table_data "groups.yml"
 

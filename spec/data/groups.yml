@@ -1,8 +1,11 @@
 primary:
+  id: 1
   name: primary
 
 secondary:
+  id: 2
   name: secondary
 
 gray:
+  id: 3
   name: gray
