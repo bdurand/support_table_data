@@ -50,13 +50,15 @@ end
 
 class Group < ActiveRecord::Base
   unless table_exists?
-    connection.create_table(table_name) do |t|
+    connection.create_table(table_name, primary_key: :group_id) do |t|
       t.string :name, index: {unique: true}
       t.timestamps
     end
   end
 
   include SupportTableData
+
+  self.primary_key = :group_id
 
   add_support_table_data "groups.yml"
 
@@ -73,7 +75,7 @@ class Hue < ActiveRecord::Base
 
   include SupportTableData
 
-  self.support_table_key_attribute = "name"
+  self.support_table_key_attribute = :name
 
   add_support_table_data "hues.yml"
 

@@ -15,7 +15,7 @@ module SupportTableData
     #
     # @return [Array<Hash>] List of saved changes for each record that was created or modified.
     def sync_table_data!
-      key_attribute = (support_table_key_attribute || :id).to_s
+      key_attribute = (support_table_key_attribute || primary_key).to_s
       canonical_data = support_table_data.each_with_object({}) { |attributes, hash| hash[attributes[key_attribute].to_s] = attributes }
       records = where(key_attribute => canonical_data.keys)
       changes = []
@@ -68,7 +68,7 @@ module SupportTableData
     def support_table_data
       @support_table_data_files ||= []
       data = {}
-      key_attribute = (support_table_key_attribute || :id).to_s
+      key_attribute = (support_table_key_attribute || primary_key).to_s
 
       @support_table_data_files.each do |data_file_path|
         file_data = support_table_parse_data_file(data_file_path)
@@ -101,7 +101,7 @@ module SupportTableData
     # @return [Array]
     def instance_keys
       unless defined?(@support_table_instance_keys)
-        key_attribute = (support_table_key_attribute || :id).to_s
+        key_attribute = (support_table_key_attribute || primary_key).to_s
         values = []
         support_table_data.each do |attributes|
           key_value = attributes[key_attribute]
@@ -118,7 +118,7 @@ module SupportTableData
     #
     # @return [Boolean]
     def protected_instance?(instance)
-      key_attribute = (support_table_key_attribute || :id).to_s
+      key_attribute = (support_table_key_attribute || primary_key).to_s
 
       unless defined?(@protected_keys)
         keys = support_table_data.collect { |attributes| attributes[key_attribute].to_s }
@@ -133,7 +133,7 @@ module SupportTableData
     def define_support_table_named_instances
       @support_table_data_files ||= []
       @support_table_instance_names ||= Set.new
-      key_attribute = (support_table_key_attribute || :id).to_s
+      key_attribute = (support_table_key_attribute || primary_key).to_s
 
       @support_table_data_files.each do |file_path|
         data = support_table_parse_data_file(file_path)

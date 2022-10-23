@@ -60,9 +60,9 @@ describe SupportTableData do
     it "returns a list of changes" do
       changes = Group.sync_table_data!
       expect(changes).to eq([
-        {"id" => [nil, 1], "name" => [nil, "primary"]},
-        {"id" => [nil, 2], "name" => [nil, "secondary"]},
-        {"id" => [nil, 3], "name" => [nil, "gray"]}
+        {"group_id" => [nil, 1], "name" => [nil, "primary"]},
+        {"group_id" => [nil, 2], "name" => [nil, "secondary"]},
+        {"group_id" => [nil, 3], "name" => [nil, "gray"]}
       ])
       expect(Group.sync_table_data!).to eq([])
 
