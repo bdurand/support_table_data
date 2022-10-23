@@ -4,7 +4,7 @@ Gem::Specification.new do |spec|
   spec.authors = ["Brian Durand"]
   spec.email = ["bbdurand@gmail.com"]
 
-  spec.summary = "ActiveRecord extension for loading and syncing data in small support tables from YAML or JSON files."
+  spec.summary = "Extension for ActiveRecord models to manage synchronizing data in support/lookup tables across environments. Also provides the ability to directly reference and test for specific rows in these tables."
 
   spec.homepage = "https://github.com/bdurand/support_table_data"
   spec.license = "MIT"
