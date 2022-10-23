@@ -42,7 +42,17 @@ end
 
 You use the `add_support_table_data` class method to add a data file path. This file must be a YAML, JSON, or CSV file that defines a list of attributes. YAML and JSON files should contain an array where each element is a hash of the attributes for each record. YAML and JSON file can also be defined as a hash when using named instances (see below). CSV files must use comma delimiters, double quotes for the quote character, and have a header row containing the attribute names.
 
-One of the attributes in your data files will be the key attribute. This attribute must uniquely identify each element. By default, the key attribute will be the row id. You can change this by setting the `support_table_key_attribute` class attribute on the model. You cannot change a key attribute. If you do, a new record will be created with the new key attribute and the existing row will be left in the table.
+One of the attributes in your data files will be the key attribute. This attribute must uniquely identify each element. By default, the key attribute will be the table's primary key. You can change this by setting the `support_table_key_attribute` class attribute on the model.
+
+```ruby
+class Status < ApplicationRecord
+  include SupportTableData
+  
+  self.support_table_key_attribute = :name
+ end
+```
+
+You cannot update the value of the key attribute in a record in the data file. If you do, a new record will be created and the existing record will be left unchanged.
 
 You can specify data files as relative paths. This can be done by setting the `SupportTableData.data_directory` value. You can override this value for a model by setting the `support_table_data_directory` attribute on its class. In a Rails application, `SupportTableData.data_directory` will be automatically set to `db/support_tables/`. Otherwise, relative file paths will be resolved from the current working directory. You must define the directory to load relative files from before loading your model classes.
 
