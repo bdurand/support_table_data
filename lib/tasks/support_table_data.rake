@@ -3,8 +3,9 @@
 namespace :support_table_data do
   desc "Syncronize data for all models that include SupportTableData."
   task sync: :environment do
+    # Eager load models if we are in a Rails enviroment with eager loading turned off.
     if defined?(Rails)
-      unless Rails.config.eager_load
+      unless Rails.configuration.eager_load
         if defined?(Rails.application.eager_load!)
           Rails.application.eager_load!
         elsif defined?(Rails.autoloaders.zeitwerk_enabled?) && Rails.autoloaders.zeitwerk_enabled?
