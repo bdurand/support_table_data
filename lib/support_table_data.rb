@@ -236,14 +236,19 @@ module SupportTableData
       end
     end
 
-    # Sync all support table classes. Classes must already be loaded in order to be
-    # synced. If a block is supplied, it will be yielded to after each class is synced
-    # with the class and a list of changes that were made.
+    # Sync all support table classes. Classes must already be loaded in order to be synced.
     #
+    # You can pass in a list of classes that you want to ensure are synced. This feature
+    # can be used to force load classes that are only loaded at runtime. For instance, if
+    # eager loading is turned off for the test environment in a Rails application (this is
+    # the default), then there is a good chance that support table models won't be loaded
+    # when the test suite is inializing.
+    #
+    # @param extra_classes [Class] List of extra classes to ensure are synced.
     # @return [Hash<Class, Array<Hash>] Hash of classes synced with a list of saved changes
-    def sync_all!
+    def sync_all!(*extra_classes)
       changes = {}
-      support_table_classes.each do |klass|
+      support_table_classes(*extra_classes).each do |klass|
         changes[klass] = klass.sync_table_data!
       end
       changes
@@ -251,12 +256,35 @@ module SupportTableData
 
     # Return the list of all support table classes in the order they should be loaded.
     # Note that this method relies on the classes already having been loaded by the application
-    # and can return indeterminate results if eager loading is turned off (i.e. development mode
-    # in a Rails application).
+    # and can return indeterminate results if eager loading is turned off (i.e. development
+    # or test mode in a Rails application).
     #
+    # If any data files exist in the default data directory, the class name that should
+    # match the file name will attempt to be loaded (i.e. "statuses.yml" will attempt to
+    # load the Status class if it exists).
+    #
+    # Otherwise, you can pass in classes that you explicitly want loaded.
+    #
+    # @param extra_classes [Class] List of extra classes to include in the return list.
     # @return [Array<Class>] List of classes in the order they should be loaded.
-    def support_table_classes
+    def support_table_classes(*extra_classes)
       classes = []
+      extra_classes.flatten.each do |klass|
+        unless klass.is_a?(Class) && klass.include?(SupportTableData)
+          raise ArgumentError.new("#{klass} does not include SupportTableData")
+        end
+        classes << klass
+      end
+
+      # Eager load any classes defined in the default data directory by guessing class names
+      # from the file names.
+      if SupportTableData.data_directory && File.exist?(SupportTableData.data_directory) && File.directory?(SupportTableData.data_directory)
+        Dir.chdir(SupportTableData.data_directory) { Dir.glob(File.join("**", "*")) }.each do |file_name|
+          class_name = file_name.sub(/\.[^.]*/, "").singularize.camelize
+          class_name.safe_constantize
+        end
+      end
+
       ActiveRecord::Base.descendants.sort_by(&:name).each do |klass|
         next unless klass.include?(SupportTableData)
         next if klass.abstract_class?

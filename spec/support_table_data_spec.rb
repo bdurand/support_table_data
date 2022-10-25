@@ -14,6 +14,29 @@ describe SupportTableData do
 
   describe "sync_table_data!" do
     it "loads data from YAML, JSON, or CSV files" do
+      Hue.sync_table_data!
+      Group.sync_table_data!
+      Color.sync_table_data!
+
+      expect(red.id).to eq 1
+      expect(red.value).to eq 0xFF0000
+
+      expect(green.id).to eq 2
+      expect(green.value).to eq 0x00FF00
+
+      expect(blue.id).to eq 3
+      expect(blue.value).to eq 0x0000FF
+
+      expect(yellow.id).to eq 11
+      expect(yellow.value).to eq 0xFFFF00
+
+      expect(white.id).to eq 14
+      expect(white.value).to eq 0xFFFFFF
+    end
+  end
+
+  describe "sync_all!" do
+    it "loads data from YAML, JSON, or CSV files" do
       SupportTableData.sync_all!
 
       expect(red.id).to eq 1
@@ -70,6 +93,10 @@ describe SupportTableData do
       expect(all_changes[Group]).to eq([])
       expect(all_changes[Hue]).to_not eq([])
       expect(all_changes[Color]).to_not eq([])
+    end
+
+    it "can be called with a list of classes to inlude" do
+      expect { SupportTableData.sync_all!(Color) }.to_not raise_error
     end
   end
 

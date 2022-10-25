@@ -47,7 +47,7 @@ One of the attributes in your data files will be the key attribute. This attribu
 ```ruby
 class Status < ApplicationRecord
   include SupportTableData
-  
+
   self.support_table_key_attribute = :name
  end
 ```
@@ -159,7 +159,12 @@ end
 
 Enhancing the `db:migrate` task also ensures that local development environments will stay up to date.
 
-You should also call `SupportTableData.sync_all!` before running your test suite. It should be called once in test suite setup code before any tests are run.
+## Testing
+
+You should also call `SupportTableData.sync_all!` before running your test suite. It should be called once in test suite setup code before any tests are run. This will vary depending on what method you are using for clearing data from the database between tests.
+
+There may be issues finding all support tables automatically in a test environment. For instance, in a Rails application, eager loading is disabled in test mode by default. The `sync_all!` method will try to discover all support table model that need to be synced by guessing which classes should exist based on the names of the data files. If any data models are missed, you can pass the classes in as arguments to `sync_all!`.
+
 
 ## Installation
 
