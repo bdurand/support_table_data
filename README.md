@@ -133,7 +133,7 @@ end
 
 ### Loading Data
 
-Calling `sync_table_data!` on your model classes will synchronize the data in your database table with the values from the data files.
+Calling `sync_table_data!` on your model class will synchronize the data in the database table with the values from the data files.
 
 ```ruby
 Status.sync_table_data!
@@ -143,11 +143,11 @@ This will add any missing records to the table and update existing records so th
 
 The number of records contained in data files should be fairly small (ideally fewer than 100). It is possible to load just a subset of rows in a large table because only rows listed in the data files will be synced. You can use this feature if your table allows user-entered data, but has a few rows that must exist for the code to work.
 
-Loading the data is done inside a database transaction. No changes will be persisted to the database unless all rows for a model are able to be synced.
+Loading data is done inside a database transaction. No changes will be persisted to the database unless all rows for a model are able to be synced.
 
-You can synchronize all models by calling `SupportTableData.sync_all!`. This method will discover all ActiveRecord models that include `SupportTableData` and synchronize each of them. Note that the model classes must already be loaded prior to calling `SupportTableData.sync_all!`. This method will produce inconsistent results in a Rails application in development mode because classes will only be loaded once they have been referenced at runtime.
+You can synchronize the data in all models by calling `SupportTableData.sync_all!`. This method will discover all ActiveRecord models that include `SupportTableData` and synchronize each of them. Note that there can be issues discovering all support table models in a Rails application if eager loading is turned off. The discovery mechanism will try to detect unloaded classes by looking at the file names in the support table data directory so it's best to stick to standard Rails naming conventions for your data files.
 
-You need to call `SupportTableData.sync_all!` when deploying your application. This gem includes a rake task `support_table_data:sync` to do this that is suitable for hooking into deploy scripts. An easy way to hook it into a Rails application is by enhancing the `db:migrate` task so that the sync task runs after database migrations are run. You can do this by adding code to a Rakefile in your applications `lib/tasks` directory:
+You need to call `SupportTableData.sync_all!` when deploying your application. This gem includes a rake task `support_table_data:sync` that is suitable for hooking into deploy scripts. An easy way to hook it into a Rails application is by enhancing the `db:migrate` task so that the sync task runs immediately after database migrations are run. You can do this by adding code to a Rakefile in your applications `lib/tasks` directory:
 
 ```ruby
 if Rake::Task.task_defined?("db:migrate")
@@ -159,12 +159,9 @@ end
 
 Enhancing the `db:migrate` task also ensures that local development environments will stay up to date.
 
-## Testing
+### Testing
 
-You should also call `SupportTableData.sync_all!` before running your test suite. It should be called once in test suite setup code before any tests are run. This will vary depending on what method you are using for clearing data from the database between tests.
-
-There may be issues finding all support tables automatically in a test environment. For instance, in a Rails application, eager loading is disabled in test mode by default. The `sync_all!` method will try to discover all support table model that need to be synced by guessing which classes should exist based on the names of the data files. If any data models are missed, you can pass the classes in as arguments to `sync_all!`.
-
+You must also call `SupportTableData.sync_all!` before running your test suite. This method should be called in the test suite setup code after any data in the test database has been purged and before any tests are run.
 
 ## Installation
 

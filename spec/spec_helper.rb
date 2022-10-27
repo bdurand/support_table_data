@@ -99,7 +99,25 @@ class Thing < ActiveRecord::Base
   belongs_to :color
 end
 
+class Invalid < ActiveRecord::Base
+  unless table_exists?
+    connection.create_table(table_name) do |t|
+      t.string :name
+    end
+  end
+
+  include SupportTableData
+
+  self.support_table_key_attribute = :name
+
+  def already_defined?
+    true
+  end
+end
+
 RSpec.configure do |config|
+  config.order = :random
+
   config.before do
     Thing.delete_all
     Hue.delete_all

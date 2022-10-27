@@ -121,6 +121,10 @@ describe SupportTableData do
       expect(Color.respond_to?(:_)).to eq false
       expect(red.respond_to?(:_?)).to eq false
     end
+
+    it "raises an error if the method is already defined" do
+      expect { Invalid.add_support_table_data("invalid.yml") }.to raise_error(ArgumentError)
+    end
   end
 
   describe "instance_names" do
@@ -151,7 +155,7 @@ describe SupportTableData do
 
   describe "support_table_classes" do
     it "gets a list of all loaded support table classes with belongs to dependencies listed first" do
-      expect(SupportTableData.support_table_classes).to eq [Group, Hue, Color]
+      expect(SupportTableData.support_table_classes).to eq [Group, Hue, Color, Invalid]
     end
   end
 end

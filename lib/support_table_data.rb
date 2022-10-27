@@ -242,9 +242,9 @@ module SupportTableData
     # can be used to force load classes that are only loaded at runtime. For instance, if
     # eager loading is turned off for the test environment in a Rails application (this is
     # the default), then there is a good chance that support table models won't be loaded
-    # when the test suite is inializing.
+    # when the test suite is initializing.
     #
-    # @param extra_classes [Class] List of extra classes to ensure are synced.
+    # @param extra_classes [Class] List of classes to force into the detected list of classes to sync.
     # @return [Hash<Class, Array<Hash>] Hash of classes synced with a list of saved changes
     def sync_all!(*extra_classes)
       changes = {}
@@ -260,13 +260,14 @@ module SupportTableData
     # or test mode in a Rails application).
     #
     # If any data files exist in the default data directory, the class name that should
-    # match the file name will attempt to be loaded (i.e. "statuses.yml" will attempt to
-    # load the Status class if it exists).
+    # match the file name will attempt to be loaded (i.e. "task/statuses.yml" will attempt to
+    # load the `Task::Status` class if it exists).
     #
-    # Otherwise, you can pass in classes that you explicitly want loaded.
+    # You can also pass in a list of classes that you explicitly want to include in the returned list.
     #
     # @param extra_classes [Class] List of extra classes to include in the return list.
     # @return [Array<Class>] List of classes in the order they should be loaded.
+    # @api private
     def support_table_classes(*extra_classes)
       classes = []
       extra_classes.flatten.each do |klass|
