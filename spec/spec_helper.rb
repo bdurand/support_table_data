@@ -8,17 +8,36 @@ require_relative "../lib/support_table_data"
 
 SupportTableData.data_directory = File.join(__dir__, "data")
 
-class Color < ActiveRecord::Base
-  unless table_exists?
-    connection.create_table(table_name) do |t|
-      t.string :name, index: {unique: true}
-      t.integer :value
-      t.string :comment
-      t.integer :group_id
-      t.integer :hue_id
-    end
+ActiveRecord::Base.connection.tap do |connection|
+  connection.create_table(:colors) do |t|
+    t.string :name, index: {unique: true}
+    t.integer :value
+    t.string :comment
+    t.integer :group_id
+    t.integer :hue_id
   end
 
+  connection.create_table(:groups, primary_key: :group_id) do |t|
+    t.string :name, index: {unique: true}
+    t.timestamps
+  end
+
+  connection.create_table(:hues) do |t|
+    t.string :name, index: {unique: true}
+    t.integer :parent_id
+  end
+
+  connection.create_table(:things) do |t|
+    t.string :name
+    t.integer :color_id
+  end
+
+  connection.create_table(:invalids) do |t|
+    t.string :name
+  end
+end
+
+class Color < ActiveRecord::Base
   include SupportTableData
 
   self.support_table_data_directory = File.join(__dir__, "data", "colors")
@@ -49,13 +68,6 @@ class Color < ActiveRecord::Base
 end
 
 class Group < ActiveRecord::Base
-  unless table_exists?
-    connection.create_table(table_name, primary_key: :group_id) do |t|
-      t.string :name, index: {unique: true}
-      t.timestamps
-    end
-  end
-
   include SupportTableData
 
   self.primary_key = :group_id
@@ -66,13 +78,6 @@ class Group < ActiveRecord::Base
 end
 
 class Hue < ActiveRecord::Base
-  unless table_exists?
-    connection.create_table(table_name) do |t|
-      t.string :name, index: {unique: true}
-      t.integer :parent_id
-    end
-  end
-
   include SupportTableData
 
   self.support_table_key_attribute = :name
@@ -89,23 +94,10 @@ class Hue < ActiveRecord::Base
 end
 
 class Thing < ActiveRecord::Base
-  unless table_exists?
-    connection.create_table(table_name) do |t|
-      t.string :name
-      t.integer :color_id
-    end
-  end
-
   belongs_to :color
 end
 
 class Invalid < ActiveRecord::Base
-  unless table_exists?
-    connection.create_table(table_name) do |t|
-      t.string :name
-    end
-  end
-
   include SupportTableData
 
   self.support_table_key_attribute = :name
