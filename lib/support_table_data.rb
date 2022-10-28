@@ -13,7 +13,7 @@ module SupportTableData
     # `add_support_table_data`. Note that rows will not be deleted if they are no longer in
     # the data files.
     #
-    # @return [Array<Hash>] list of saved changes for each record that was created or modified
+    # @return [Array<Hash>] List of saved changes for each record that was created or modified.
     def sync_table_data!
       key_attribute = (support_table_key_attribute || primary_key).to_s
       canonical_data = support_table_data.each_with_object({}) { |attributes, hash| hash[attributes[key_attribute].to_s] = attributes }
@@ -64,7 +64,7 @@ module SupportTableData
 
     # Get the data for the support table from the data files.
     #
-    # @return [Array<Hash>] list of attribute hashes for all records defined in the data files
+    # @return [Array<Hash>] List of attributes for all records in the data files.
     def support_table_data
       @support_table_data_files ||= []
       data = {}
@@ -90,7 +90,7 @@ module SupportTableData
 
     # Get the names of all named instances.
     #
-    # @return [Array<String>] list of all instance names
+    # @return [Array<String>] List of all instance names.
     def instance_names
       @support_table_instance_names ||= Set.new
       @support_table_instance_names.to_a
@@ -98,7 +98,7 @@ module SupportTableData
 
     # Get the key values for all instances loaded from the data files.
     #
-    # @return [Array] list of all the key attribute values
+    # @return [Array] List of all the key attribute values.
     def instance_keys
       unless defined?(@support_table_instance_keys)
         key_attribute = (support_table_key_attribute || primary_key).to_s
@@ -244,8 +244,8 @@ module SupportTableData
     # the default), then there is a good chance that support table models won't be loaded
     # when the test suite is initializing.
     #
-    # @param extra_classes [Class] list of classes to force into the detected list of classes to sync
-    # @return [Hash<Class, Array<Hash>] Hash of classes synced with a list of saved changes
+    # @param extra_classes [Class] List of classes to force into the detected list of classes to sync.
+    # @return [Hash<Class, Array<Hash>] Hash of classes synced with a list of saved changes.
     def sync_all!(*extra_classes)
       changes = {}
       support_table_classes(*extra_classes).each do |klass|
@@ -265,8 +265,8 @@ module SupportTableData
     #
     # You can also pass in a list of classes that you explicitly want to include in the returned list.
     #
-    # @param extra_classes [Class] list of extra classes to include in the return list
-    # @return [Array<Class>] list of classes in the order they should be loaded
+    # @param extra_classes [Class] List of extra classes to include in the return list.
+    # @return [Array<Class>] List of classes in the order they should be loaded.
     # @api private
     def support_table_classes(*extra_classes)
       classes = []
