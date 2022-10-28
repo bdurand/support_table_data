@@ -141,13 +141,13 @@ Status.sync_table_data!
 
 This will add any missing records to the table and update existing records so that the attributes in the table match the values in the data files. Records that do not appear in the data files will not be touched. Any attributes not specified in the data files will not be changed.
 
-The number of records contained in data files should be fairly small (ideally fewer than 100). It is possible to load just a subset of rows in a large table because only rows listed in the data files will be synced. You can use this feature if your table allows user-entered data, but has a few rows that must exist for the code to work.
+The number of records contained in data files should be fairly small (ideally fewer than 100). It is possible to load just a subset of rows in a large table because only the rows listed in the data files will be synced. You can use this feature if your table allows user-entered data, but has a few rows that must exist for the code to work.
 
-Loading data is done inside a database transaction. No changes will be persisted to the database unless all rows for a model are able to be synced.
+Loading data is done inside a database transaction. No changes will be persisted to the database unless all rows for a model can be synced.
 
-You can synchronize the data in all models by calling `SupportTableData.sync_all!`. This method will discover all ActiveRecord models that include `SupportTableData` and synchronize each of them. Note that there can be issues discovering all support table models in a Rails application if eager loading is turned off. The discovery mechanism will try to detect unloaded classes by looking at the file names in the support table data directory so it's best to stick to standard Rails naming conventions for your data files.
+You can synchronize the data in all models by calling `SupportTableData.sync_all!`. This method will discover all ActiveRecord models that include `SupportTableData` and synchronize each of them. (Note that there can be issues discovering all support table models in a Rails application if eager loading is turned off.) The discovery mechanism will try to detect unloaded classes by looking at the file names in the support table data directory so it's best to stick to standard Rails naming conventions for your data files.
 
-You need to call `SupportTableData.sync_all!` when deploying your application. This gem includes a rake task `support_table_data:sync` that is suitable for hooking into deploy scripts. An easy way to hook it into a Rails application is by enhancing the `db:migrate` task so that the sync task runs immediately after database migrations are run. You can do this by adding code to a Rakefile in your applications `lib/tasks` directory:
+You need to call `SupportTableData.sync_all!` when deploying your application. This gem includes a rake task `support_table_data:sync` that is suitable for hooking into deploy scripts. An easy way to hook it into a Rails application is by enhancing the `db:migrate` task so that the sync task runs immediately after database migrations are run. You can do this by adding code to a Rakefile in your application's `lib/tasks` directory:
 
 ```ruby
 if Rake::Task.task_defined?("db:migrate")

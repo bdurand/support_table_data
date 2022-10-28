@@ -240,7 +240,7 @@ module SupportTableData
     #
     # You can pass in a list of classes that you want to ensure are synced. This feature
     # can be used to force load classes that are only loaded at runtime. For instance, if
-    # eager loading is turned off for the test environment in a Rails application (this is
+    # eager loading is turned off for the test environment in a Rails application (which is
     # the default), then there is a good chance that support table models won't be loaded
     # when the test suite is initializing.
     #
@@ -255,12 +255,12 @@ module SupportTableData
     end
 
     # Return the list of all support table classes in the order they should be loaded.
-    # Note that this method relies on the classes already having been loaded by the application
-    # and can return indeterminate results if eager loading is turned off (i.e. development
+    # Note that this method relies on the classes already having been loaded by the application.
+    # It can return indeterminate results if eager loading is turned off (i.e. development
     # or test mode in a Rails application).
     #
-    # If any data files exist in the default data directory, the class name that should
-    # match the file name will attempt to be loaded (i.e. "task/statuses.yml" will attempt to
+    # If any data files exist in the default data directory, any class name that matches
+    # the file name will attempt to be loaded (i.e. "task/statuses.yml" will attempt to
     # load the `Task::Status` class if it exists).
     #
     # You can also pass in a list of classes that you explicitly want to include in the returned list.
