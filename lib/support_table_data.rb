@@ -15,6 +15,8 @@ module SupportTableData
     #
     # @return [Array<Hash>] List of saved changes for each record that was created or modified.
     def sync_table_data!
+      return unless table_exists?
+
       key_attribute = (support_table_key_attribute || primary_key).to_s
       canonical_data = support_table_data.each_with_object({}) { |attributes, hash| hash[attributes[key_attribute].to_s] = attributes }
       records = where(key_attribute => canonical_data.keys)
