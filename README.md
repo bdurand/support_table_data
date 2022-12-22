@@ -68,17 +68,17 @@ Here is an example data file using named instances:
 pending:
   id: 1
   name: Pending
-  icon: :clock:
+  icon: clock
 
 in_progress:
   id: 2
   name: In Progress
-  icon: :construction:
+  icon: construction
 
 completed:
   id: 3
   name: Completed
-  icon: :heavy_check_mark:
+  icon: heavy_check_mark
 
 _others:
   - id: 4
