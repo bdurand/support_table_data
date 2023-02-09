@@ -158,4 +158,26 @@ describe SupportTableData do
       expect(SupportTableData.support_table_classes).to eq [Group, Hue, Color, Invalid]
     end
   end
+
+  describe "suppport_table_data" do
+    it "returns an array with all the attributes" do
+      data = Color.support_table_data
+      expect(data.size).to eq 11
+      expect(data).to include({
+        "id" => 1,
+        "name" => "Red",
+        "hex" => "0xFF0000",
+        "group_name" => "primary",
+        "hue_name" => "red"
+      })
+    end
+
+    it "returns a fresh copy every call" do
+      data_1 = Color.support_table_data
+      data_2 = Color.support_table_data
+      expect(data_1.object_id).to_not eq data_2.object_id
+      expect(data_1.map(&:object_id)).to_not match_array data_2.map(&:object_id)
+      expect(data_1.map { |attributes| attributes.values.map(&:object_id) }.flatten).to_not match_array data_2.map { |attributes| attributes.values.map(&:object_id) }.flatten
+    end
+  end
 end
