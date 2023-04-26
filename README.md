@@ -104,7 +104,8 @@ status.completed?   # status.id == 3
 
 Helper methods will not override already defined methods on a model class. If a method is already defined, an `ArgumentError` will be raised.
 
-You can also define helper methods for named instance attributes.
+You can also define helper methods for named instance attributes. These helper methods will return the hard coded values from the data file. Calling these methods does not require a database connection.
+
 
 ```ruby
 class Status < ApplicationRecord
@@ -117,8 +118,6 @@ Status.pending_id     # => 1
 Status.in_progress_id # => 2
 Status.completed_id   # => 3
 ```
-
-These helper methods will return the hard coded values from the data file and will not query the database.
 
 ### Caching
 

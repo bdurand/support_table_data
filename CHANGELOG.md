@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Additional helper methods defined on the class to expose the key values for named instances.
+- Helper methods can defined on the class to expose attributes for named instances without requiring a database connection.
 
 ## 1.0.0
 

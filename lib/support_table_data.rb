@@ -64,7 +64,7 @@ module SupportTableData
       define_support_table_named_instances
     end
 
-    # Add class methods to get attribute values for named instances. The methods will be named
+    # Add class methods to get attributes for named instances. The methods will be named
     # like `#{instance_name}_#{attribute_name}`. For example, if the name is "active" and the
     # attribute is "id", then the method will be "active_id" and you can call
     # `Model.active_id` to get the value.
