@@ -139,6 +139,17 @@ describe SupportTableData do
     end
   end
 
+  describe "named_instance_attribute_helpers" do
+    it "adds helper methods for each attribute on named instances" do
+      expect(Group.primary_group_id).to eq 1
+      expect(Group.secondary_group_id).to eq 2
+      expect(Group.gray_group_id).to eq 3
+      expect(Group.primary_name).to eq "primary"
+      expect(Group.secondary_name).to eq "secondary"
+      expect(Group.gray_name).to eq "gray"
+    end
+  end
+
   describe "protected_instance?" do
     it "returns true if the instance came from a data file" do
       red = Color.new

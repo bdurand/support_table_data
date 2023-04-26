@@ -104,6 +104,22 @@ status.completed?   # status.id == 3
 
 Helper methods will not override already defined methods on a model class. If a method is already defined, an `ArgumentError` will be raised.
 
+You can also define helper methods for named instance attributes.
+
+```ruby
+class Status < ApplicationRecord
+  include SupportTableData
+
+  named_instance_attribute_helpers :id
+end
+
+Status.pending_id     # => 1
+Status.in_progress_id # => 2
+Status.completed_id   # => 3
+```
+
+These helper methods will return the hard coded values from the data file and will not query the database.
+
 ### Caching
 
 You can use the companion [support_table_cache gem](https://github.com/bdurand/support_table_cache) to add caching support to your models. That way your application won't need to constantly query the database for records that will never change.
