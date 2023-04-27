@@ -79,6 +79,15 @@ module SupportTableData
       define_support_table_named_instances
     end
 
+    # Get the names of any named instance attribute helpers that have been defined
+    # with `named_instance_attribute_helpers`.
+    #
+    # @return [Array<String>] List of attribute names.
+    def support_table_attribute_helpers
+      @support_table_attribute_helpers ||= {}
+      @support_table_attribute_helpers.keys
+    end
+
     # Get the data for the support table from the data files.
     #
     # @return [Array<Hash>] List of attributes for all records in the data files.

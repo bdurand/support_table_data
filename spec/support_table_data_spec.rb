@@ -148,6 +148,11 @@ describe SupportTableData do
       expect(Group.secondary_name).to eq "secondary"
       expect(Group.gray_name).to eq "gray"
     end
+
+    it "can get a list of the defined attribute helpers" do
+      expect(Group.support_table_attribute_helpers).to match_array ["group_id", "name"]
+      expect(Color.support_table_attribute_helpers).to match_array []
+    end
   end
 
   describe "protected_instance?" do
