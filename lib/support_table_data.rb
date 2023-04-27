@@ -64,6 +64,30 @@ module SupportTableData
       define_support_table_named_instances
     end
 
+    # Add class methods to get attributes for named instances. The methods will be named
+    # like `#{instance_name}_#{attribute_name}`. For example, if the name is "active" and the
+    # attribute is "id", then the method will be "active_id" and you can call
+    # `Model.active_id` to get the value.
+    #
+    # @param attributes [String, Symbol] The names of the attributes to add helper methods for.
+    # @return [void]
+    def named_instance_attribute_helpers(*attributes)
+      @support_table_attribute_helpers ||= {}
+      attributes.flatten.collect(&:to_s).each do |attribute|
+        @support_table_attribute_helpers[attribute] = []
+      end
+      define_support_table_named_instances
+    end
+
+    # Get the names of any named instance attribute helpers that have been defined
+    # with `named_instance_attribute_helpers`.
+    #
+    # @return [Array<String>] List of attribute names.
+    def support_table_attribute_helpers
+      @support_table_attribute_helpers ||= {}
+      @support_table_attribute_helpers.keys
+    end
+
     # Get the data for the support table from the data files.
     #
     # @return [Array<Hash>] List of attributes for all records in the data files.
@@ -135,35 +159,52 @@ module SupportTableData
     def define_support_table_named_instances
       @support_table_data_files ||= []
       @support_table_instance_names ||= Set.new
-      key_attribute = (support_table_key_attribute || primary_key).to_s
 
       @support_table_data_files.each do |file_path|
         data = support_table_parse_data_file(file_path)
-        if data.is_a?(Hash)
-          data.each do |key, attributes|
-            method_name = key.to_s.freeze
-            next if method_name.start_with?("_")
+        next unless data.is_a?(Hash)
 
-            unless attributes.is_a?(Hash)
-              raise ArgumentError.new("Cannot define named instance #{method_name} on #{name}; value must be a Hash")
-            end
+        data.each do |name, attributes|
+          define_support_table_named_instance_methods(name, attributes)
+        end
+      end
+    end
 
-            unless method_name.match?(/\A[a-z][a-z0-9_]+\z/)
-              raise ArgumentError.new("Cannot define named instance #{method_name} on #{name}; name contains illegal characters")
-            end
+    def define_support_table_named_instance_methods(name, attributes)
+      method_name = name.to_s.freeze
+      return if method_name.start_with?("_")
 
-            unless @support_table_instance_names.include?(method_name)
-              @support_table_instance_names << method_name
-              key_value = attributes[key_attribute]
-              define_support_table_instance_helper(method_name, key_attribute, key_value)
-              define_support_table_predicates_helper("#{method_name}?", key_attribute, key_value)
-            end
-          end
+      unless attributes.is_a?(Hash)
+        raise ArgumentError.new("Cannot define named instance #{method_name} on #{name}; value must be a Hash")
+      end
+
+      unless method_name.match?(/\A[a-z][a-z0-9_]+\z/)
+        raise ArgumentError.new("Cannot define named instance #{method_name} on #{name}; name contains illegal characters")
+      end
+
+      key_attribute = (support_table_key_attribute || primary_key).to_s
+      key_value = attributes[key_attribute]
+
+      unless @support_table_instance_names.include?(method_name)
+        define_support_table_instance_helper(method_name, key_attribute, key_value)
+        define_support_table_predicates_helper("#{method_name}?", key_attribute, key_value)
+        @support_table_instance_names << method_name
+      end
+
+      if defined?(@support_table_attribute_helpers)
+        @support_table_attribute_helpers.each do |attribute_name, defined_methods|
+          attribute_method_name = "#{method_name}_#{attribute_name}"
+          next if defined_methods.include?(attribute_method_name)
+
+          define_support_table_instance_attribute_helper(attribute_method_name, attributes[attribute_name])
+          defined_methods << attribute_method_name
         end
       end
     end
 
     def define_support_table_instance_helper(method_name, attribute_name, attribute_value)
+      return if @support_table_instance_names.include?("self.#{method_name}")
+
       if respond_to?(method_name, true)
         raise ArgumentError.new("Could not define support table helper method #{name}.#{method_name} because it is already a defined method")
       end
@@ -175,7 +216,23 @@ module SupportTableData
       RUBY
     end
 
+    def define_support_table_instance_attribute_helper(method_name, attribute_value)
+      return if @support_table_instance_names.include?("self.#{method_name}")
+
+      if respond_to?(method_name, true)
+        raise ArgumentError.new("Could not define support table helper method #{name}.#{method_name} because it is already a defined method")
+      end
+
+      class_eval <<~RUBY, __FILE__, __LINE__ + 1
+        def self.#{method_name}
+          #{attribute_value.inspect}
+        end
+      RUBY
+    end
+
     def define_support_table_predicates_helper(method_name, attribute_name, attribute_value)
+      return if @support_table_instance_names.include?(method_name)
+
       if method_defined?(method_name) || private_method_defined?(method_name)
         raise ArgumentError.new("Could not define support table helper method #{name}##{method_name} because it is already a defined method")
       end
