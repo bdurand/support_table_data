@@ -225,7 +225,7 @@ module SupportTableData
 
       class_eval <<~RUBY, __FILE__, __LINE__ + 1
         def self.#{method_name}
-          #{attribute_value.inspect}
+          #{attribute_value.inspect}.freeze
         end
       RUBY
     end
