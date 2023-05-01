@@ -153,6 +153,11 @@ describe SupportTableData do
       expect(Group.support_table_attribute_helpers).to match_array ["group_id", "name"]
       expect(Color.support_table_attribute_helpers).to match_array []
     end
+
+    it "returns frozen values" do
+      expect(Group.primary_group_id).to be_frozen
+      expect(Group.primary_name).to be_frozen
+    end
   end
 
   describe "protected_instance?" do
