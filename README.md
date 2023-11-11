@@ -1,6 +1,7 @@
 # Support Table Data
 
 [![Continuous Integration](https://github.com/bdurand/support_table_data/actions/workflows/continuous_integration.yml/badge.svg)](https://github.com/bdurand/support_table_data/actions/workflows/continuous_integration.yml)
+[![Regression Test](https://github.com/bdurand/support_table_data/actions/workflows/regression_test.yml/badge.svg)](https://github.com/bdurand/support_table_data/actions/workflows/regression_test.yml)
 [![Ruby Style Guide](https://img.shields.io/badge/code_style-standard-brightgreen.svg)](https://github.com/testdouble/standard)
 
 This gem provides a mixin for ActiveRecord support table models that allows you to load data from YAML, JSON, or CSV files and reference specific records more easily. It is intended to solve issues with support tables (also known as lookup tables) that contain a small set of canonical data that must exist for your application to work.
