@@ -305,9 +305,9 @@ module SupportTableData
     #
     # @param extra_classes [Class] List of classes to force into the detected list of classes to sync.
     # @return [Hash<Class, Array<Hash>] Hash of classes synced with a list of saved changes.
-    def sync_all!(*)
+    def sync_all!(*extra_classes)
       changes = {}
-      support_table_classes(*).each do |klass|
+      support_table_classes(*extra_classes).each do |klass|
         changes[klass] = klass.sync_table_data!
       end
       changes
