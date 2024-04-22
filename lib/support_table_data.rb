@@ -28,7 +28,7 @@ module SupportTableData
             key = record[key_attribute].to_s
             attributes = canonical_data.delete(key)
             attributes&.each do |name, value|
-              record.send("#{name}=", value) if record.respond_to?("#{name}=", true)
+              record.send(:"#{name}=", value) if record.respond_to?(:"#{name}=", true)
             end
             if record.changed?
               changes << record.changes
@@ -39,7 +39,7 @@ module SupportTableData
           canonical_data.each_value do |attributes|
             record = new
             attributes.each do |name, value|
-              record.send("#{name}=", value) if record.respond_to?("#{name}=", true)
+              record.send(:"#{name}=", value) if record.respond_to?(:"#{name}=", true)
             end
             changes << record.changes
             record.save!
@@ -132,7 +132,7 @@ module SupportTableData
         support_table_data.each do |attributes|
           key_value = attributes[key_attribute]
           instance = new
-          instance.send("#{key_attribute}=", key_value)
+          instance.send(:"#{key_attribute}=", key_value)
           values << instance.send(key_attribute)
         end
         @support_table_instance_keys = values.uniq
