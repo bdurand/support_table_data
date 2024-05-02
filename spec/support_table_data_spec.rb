@@ -95,8 +95,13 @@ describe SupportTableData do
       expect(all_changes[Color]).to_not eq([])
     end
 
-    it "can be called with a list of classes to inlude" do
+    it "can be called with a list of classes to include" do
       expect { SupportTableData.sync_all!(Color) }.to_not raise_error
+    end
+
+    it "ignores anonomous classes" do
+      Class.new(ActiveRecord::Base)
+      expect { SupportTableData.sync_all! }.to_not raise_error
     end
   end
 
