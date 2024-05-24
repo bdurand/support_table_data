@@ -398,11 +398,16 @@ module SupportTableData
     # @return [Array<Class>]
     def support_table_dependencies(klass)
       dependencies = []
-      klass.reflections.values.select(&:belongs_to?).each do |reflection|
-        if reflection.klass.include?(SupportTableData) && !(reflection.klass <= klass)
-          dependencies << reflection.klass
-        end
+
+      klass.reflections.values.each do |reflection|
+        next if reflection.polymorphic?
+        next unless reflection.klass.include?(SupportTableData)
+        next if reflection.klass <= klass
+        next unless reflection.belongs_to? || reflection.through_reflection?
+
+        dependencies << reflection.klass
       end
+
       dependencies
     end
   end

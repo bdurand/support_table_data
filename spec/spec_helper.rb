@@ -27,9 +27,14 @@ ActiveRecord::Base.connection.tap do |connection|
     t.integer :parent_id
   end
 
+  connection.create_table(:shades) do |t|
+    t.string :name
+  end
+
   connection.create_table(:things) do |t|
     t.string :name
     t.integer :color_id
+    t.integer :shade_id
   end
 
   connection.create_table(:invalids) do |t|
@@ -49,11 +54,13 @@ class Color < ActiveRecord::Base
 
   belongs_to :group
   belongs_to :hue
+  has_many :things
+  has_many :shades, through: :things
 
   validates_uniqueness_of :name
 
   def group_name=(value)
-    self.group = Group.find_by!(name: value)
+    self.group = Group.named_instance(value)
   end
 
   def hue_name=(value)
@@ -97,8 +104,19 @@ class Hue < ActiveRecord::Base
   end
 end
 
+class Shade < ActiveRecord::Base
+  include SupportTableData
+
+  self.support_table_key_attribute = :name
+
+  add_support_table_data "shades.yml"
+
+  validates_uniqueness_of :name
+end
+
 class Thing < ActiveRecord::Base
   belongs_to :color
+  belongs_to :shade
 end
 
 class Invalid < ActiveRecord::Base

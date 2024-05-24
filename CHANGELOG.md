@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added `named_instance` method to load a named instance from the database.
 - Added class method `named_instance_data` to return attributes from the data files for a named instance.
+- Added handling for `has_many through` associations to load the dependent through associations first.
 
 ## 1.1.2
 
