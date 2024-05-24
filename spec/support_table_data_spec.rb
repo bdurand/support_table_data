@@ -116,6 +116,13 @@ describe SupportTableData do
       expect { Color.red }.to raise_error(ActiveRecord::RecordNotFound)
     end
 
+    it "can load an instance by name" do
+      SupportTableData.sync_all!
+      expect(Color.named_instance("red")).to eq red
+      expect(Color.named_instance(:red)).to eq red
+      expect { Color.named_instance("pink") }.to raise_error(ActiveRecord::RecordNotFound)
+    end
+
     it "defines predicate methods for comparing an attribute" do
       SupportTableData.sync_all!
       expect(red.red?).to eq true
@@ -185,7 +192,7 @@ describe SupportTableData do
     end
   end
 
-  describe "suppport_table_data" do
+  describe "support_table_data" do
     it "returns an array with all the attributes" do
       data = Color.support_table_data
       expect(data.size).to eq 11
@@ -204,6 +211,25 @@ describe SupportTableData do
       expect(data_1.object_id).to_not eq data_2.object_id
       expect(data_1.map(&:object_id)).to_not match_array data_2.map(&:object_id)
       expect(data_1.map { |attributes| attributes.values.map(&:object_id) }.flatten).to_not match_array data_2.map { |attributes| attributes.values.map(&:object_id) }.flatten
+    end
+  end
+
+  describe "named_instance_data" do
+    it "returns a hash of the named instances" do
+      data = Color.named_instance_data("red")
+      expect(data["name"]).to eq "Red"
+    end
+
+    it "can use a symbol as the name" do
+      data = Color.named_instance_data(:red)
+      expect(data["name"]).to eq "Red"
+    end
+
+    it "returns a fresh copy every call" do
+      data_1 = Color.named_instance_data("red")
+      data_2 = Color.named_instance_data("red")
+      expect(data_1.object_id).to_not eq data_2.object_id
+      expect(data_1.values.map(&:object_id)).to_not match_array data_2.values.map(&:object_id)
     end
   end
 end
