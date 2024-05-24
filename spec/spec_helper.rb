@@ -57,6 +57,9 @@ class Color < ActiveRecord::Base
   has_many :things
   has_many :shades, through: :things
 
+  # Intentionally invalid association
+  belongs_to :non_existent, class_name: "NonExistent"
+
   validates_uniqueness_of :name
 
   def group_name=(value)
