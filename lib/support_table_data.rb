@@ -406,7 +406,7 @@ module SupportTableData
         next unless reflection.belongs_to? || reflection.through_reflection?
 
         dependencies << reflection.klass
-      rescue StandardError => e
+      rescue => e
         message = "Error inspecting reflection #{reflection.name} on #{klass.name}: #{e.inspect}"
         klass.logger&.warn(message)
       end
