@@ -8,7 +8,24 @@
 module SupportTableData
   extend ActiveSupport::Concern
 
-  module ClassMethods
+  included do
+    # Internal variables used for memoization.
+    @support_table_data_files = []
+    @support_table_attribute_helpers = {}
+    @support_table_instance_names = {}
+    @support_table_instance_keys = nil
+
+    # Define the attribute used as the key of the hash in the data files.
+    # This should be a value that never changes. By default the key attribute will be the id.
+    class_attribute :support_table_key_attribute, instance_accessor: false
+
+    # Define the directory where data files should be loaded from. This value will override the global
+    # value set by SupportTableData.data_directory. This is only used if relative paths are passed
+    # in to add_support_table_data.
+    class_attribute :support_table_data_directory, instance_accessor: false
+  end
+
+  class_methods do
     # Synchronize the rows in the table with the values defined in the data files added with
     # `add_support_table_data`. Note that rows will not be deleted if they are no longer in
     # the data files.
@@ -58,7 +75,6 @@ module SupportTableData
     #   this model or the global directory set with SupportTableData.data_directory.
     # @return [void]
     def add_support_table_data(data_file_path)
-      @support_table_data_files ||= []
       root_dir = (support_table_data_directory || SupportTableData.data_directory || Dir.pwd)
       @support_table_data_files << File.expand_path(data_file_path, root_dir)
       define_support_table_named_instances
@@ -72,7 +88,6 @@ module SupportTableData
     # @param attributes [String, Symbol] The names of the attributes to add helper methods for.
     # @return [void]
     def named_instance_attribute_helpers(*attributes)
-      @support_table_attribute_helpers ||= {}
       attributes.flatten.collect(&:to_s).each do |attribute|
         @support_table_attribute_helpers[attribute] = []
       end
@@ -84,7 +99,6 @@ module SupportTableData
     #
     # @return [Array<String>] List of attribute names.
     def support_table_attribute_helpers
-      @support_table_attribute_helpers ||= {}
       @support_table_attribute_helpers.keys
     end
 
@@ -92,7 +106,6 @@ module SupportTableData
     #
     # @return [Array<Hash>] List of attributes for all records in the data files.
     def support_table_data
-      @support_table_data_files ||= []
       data = {}
       key_attribute = (support_table_key_attribute || primary_key).to_s
 
@@ -114,19 +127,51 @@ module SupportTableData
       data.values
     end
 
+    # Get the data for a named instances from the data files.
+    #
+    # @return [Hasn] Hash of named instance attributes.
+    def named_instance_data(name)
+      data = {}
+      name = name.to_s
+
+      @support_table_data_files.each do |data_file_path|
+        file_data = support_table_parse_data_file(data_file_path)
+        next unless file_data.is_a?(Hash)
+
+        file_data.each do |instance_name, attributes|
+          next unless name == instance_name.to_s
+          next unless attributes.is_a?(Hash)
+
+          data.merge!(attributes)
+        end
+      end
+
+      data
+    end
+
     # Get the names of all named instances.
     #
     # @return [Array<String>] List of all instance names.
     def instance_names
-      @support_table_instance_names ||= Set.new
-      @support_table_instance_names.to_a
+      @support_table_instance_names.keys
+    end
+
+    # Load a named instance from the database.
+    #
+    # @param instance_name [String, Symbol] The name of the instance to load as defined in the data files.
+    # @return [ActiveRecord::Base] The instance loaded from the database.
+    # @raise [ActiveRecord::RecordNotFound] If the instance does not exist.
+    def named_instance(instance_name)
+      key_attribute = (support_table_key_attribute || primary_key).to_s
+      instance_name = instance_name.to_s
+      find_by!(key_attribute => @support_table_instance_names[instance_name])
     end
 
     # Get the key values for all instances loaded from the data files.
     #
     # @return [Array] List of all the key attribute values.
     def instance_keys
-      unless defined?(@support_table_instance_keys)
+      if @support_table_instance_keys.nil?
         key_attribute = (support_table_key_attribute || primary_key).to_s
         values = []
         support_table_data.each do |attributes|
@@ -157,9 +202,6 @@ module SupportTableData
     private
 
     def define_support_table_named_instances
-      @support_table_data_files ||= []
-      @support_table_instance_names ||= Set.new
-
       @support_table_data_files.each do |file_path|
         data = support_table_parse_data_file(file_path)
         next unless data.is_a?(Hash)
@@ -188,7 +230,7 @@ module SupportTableData
       unless @support_table_instance_names.include?(method_name)
         define_support_table_instance_helper(method_name, key_attribute, key_value)
         define_support_table_predicates_helper("#{method_name}?", key_attribute, key_value)
-        @support_table_instance_names << method_name
+        @support_table_instance_names[method_name] = key_value
       end
 
       if defined?(@support_table_attribute_helpers)
@@ -203,8 +245,6 @@ module SupportTableData
     end
 
     def define_support_table_instance_helper(method_name, attribute_name, attribute_value)
-      return if @support_table_instance_names.include?("self.#{method_name}")
-
       if respond_to?(method_name, true)
         raise ArgumentError.new("Could not define support table helper method #{name}.#{method_name} because it is already a defined method")
       end
@@ -217,8 +257,6 @@ module SupportTableData
     end
 
     def define_support_table_instance_attribute_helper(method_name, attribute_value)
-      return if @support_table_instance_names.include?("self.#{method_name}")
-
       if respond_to?(method_name, true)
         raise ArgumentError.new("Could not define support table helper method #{name}.#{method_name} because it is already a defined method")
       end
@@ -231,8 +269,6 @@ module SupportTableData
     end
 
     def define_support_table_predicates_helper(method_name, attribute_name, attribute_value)
-      return if @support_table_instance_names.include?(method_name)
-
       if method_defined?(method_name) || private_method_defined?(method_name)
         raise ArgumentError.new("Could not define support table helper method #{name}##{method_name} because it is already a defined method")
       end
@@ -266,17 +302,6 @@ module SupportTableData
 
       data
     end
-  end
-
-  included do
-    # Define the attribute used as the key of the hash in the data files.
-    # This should be a value that never changes. By default the key attribute will be the id.
-    class_attribute :support_table_key_attribute, instance_accessor: false
-
-    # Define the directory where data files should be loaded from. This value will override the global
-    # value set by SupportTableData.data_directory. This is only used if relative paths are passed
-    # in to add_support_table_data.
-    class_attribute :support_table_data_directory, instance_accessor: false
   end
 
   class << self

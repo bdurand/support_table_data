@@ -1,7 +1,6 @@
 # Support Table Data
 
 [![Continuous Integration](https://github.com/bdurand/support_table_data/actions/workflows/continuous_integration.yml/badge.svg)](https://github.com/bdurand/support_table_data/actions/workflows/continuous_integration.yml)
-[![Regression Test](https://github.com/bdurand/support_table_data/actions/workflows/regression_test.yml/badge.svg)](https://github.com/bdurand/support_table_data/actions/workflows/regression_test.yml)
 [![Ruby Style Guide](https://img.shields.io/badge/code_style-standard-brightgreen.svg)](https://github.com/testdouble/standard)
 [![Gem Version](https://badge.fury.io/rb/support_table_data.svg)](https://badge.fury.io/rb/support_table_data)
 
@@ -121,6 +120,55 @@ Status.in_progress_id # => 2
 Status.completed_id   # => 3
 ```
 
+You can also use named instances to maintain associations between you models. In order to do this you'll need to implement a custom setter method.
+
+```ruby
+class Group < ApplicationRecord
+  include SupportTableData
+
+  has_many :statuses
+end
+
+class Status < ApplicationRecord
+  include SupportTableData
+
+  belongs_to :group
+
+  def group_name=(instance_name)
+    self.group = Group.named_instance(instance_name)
+  end
+end
+```
+
+This then allows you to reference groups by instance name in the statuses.yml file:
+
+```yaml
+# groups.yml
+not_done:
+  id: 1
+  name: Not Done
+
+done:
+  id: 2
+  name: Done
+
+# statuses.yml
+pending:
+  id: 1
+  name: Pending
+  group_name: not_done
+
+in_progress:
+  id: 2
+  name: In Progress
+  group_name: not_done
+
+completed:
+  id: 3
+  name: Completed
+  group_name: done
+```
+
 ### Caching
 
 You can use the companion [support_table_cache gem](https://github.com/bdurand/support_table_cache) to add caching support to your models. That way your application won't need to constantly query the database for records that will never change.
@@ -163,6 +211,8 @@ The number of records contained in data files should be fairly small (ideally fe
 Loading data is done inside a database transaction. No changes will be persisted to the database unless all rows for a model can be synced.
 
 You can synchronize the data in all models by calling `SupportTableData.sync_all!`. This method will discover all ActiveRecord models that include `SupportTableData` and synchronize each of them. (Note that there can be issues discovering all support table models in a Rails application if eager loading is turned off.) The discovery mechanism will try to detect unloaded classes by looking at the file names in the support table data directory so it's best to stick to standard Rails naming conventions for your data files.
+
+The load order for models will resolve any dependencies between models. So if one model has a `belongs_to` association with another model, then the belongs to model will be loaded first.
 
 You need to call `SupportTableData.sync_all!` when deploying your application. This gem includes a rake task `support_table_data:sync` that is suitable for hooking into deploy scripts. An easy way to hook it into a Rails application is by enhancing the `db:migrate` task so that the sync task runs immediately after database migrations are run. You can do this by adding code to a Rakefile in your application's `lib/tasks` directory:
 
