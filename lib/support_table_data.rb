@@ -10,6 +10,7 @@ module SupportTableData
 
   included do
     # Internal variables used for memoization.
+    @mutex = Mutex.new
     @support_table_data_files = []
     @support_table_attribute_helpers = {}
     @support_table_instance_names = {}
@@ -76,7 +77,10 @@ module SupportTableData
     # @return [void]
     def add_support_table_data(data_file_path)
       root_dir = (support_table_data_directory || SupportTableData.data_directory || Dir.pwd)
-      @support_table_data_files << File.expand_path(data_file_path, root_dir)
+      @mutex.synchronize do
+        @support_table_data_files += [File.expand_path(data_file_path, root_dir)]
+        @support_table_instance_keys = nil
+      end
       define_support_table_named_instances
     end
 
@@ -88,8 +92,10 @@ module SupportTableData
     # @param attributes [String, Symbol] The names of the attributes to add helper methods for.
     # @return [void]
     def named_instance_attribute_helpers(*attributes)
-      attributes.flatten.collect(&:to_s).each do |attribute|
-        @support_table_attribute_helpers[attribute] = []
+      @mutex.synchronize do
+        attributes.flatten.collect(&:to_s).each do |attribute|
+          @support_table_attribute_helpers = @support_table_attribute_helpers.merge(attribute => [])
+        end
       end
       define_support_table_named_instances
     end
@@ -207,7 +213,9 @@ module SupportTableData
         next unless data.is_a?(Hash)
 
         data.each do |name, attributes|
-          define_support_table_named_instance_methods(name, attributes)
+          @mutex.synchronize do
+            define_support_table_named_instance_methods(name, attributes)
+          end
         end
       end
     end
@@ -230,17 +238,15 @@ module SupportTableData
       unless @support_table_instance_names.include?(method_name)
         define_support_table_instance_helper(method_name, key_attribute, key_value)
         define_support_table_predicates_helper("#{method_name}?", key_attribute, key_value)
-        @support_table_instance_names[method_name] = key_value
+        @support_table_instance_names = @support_table_instance_names.merge(method_name => key_value)
       end
 
-      if defined?(@support_table_attribute_helpers)
-        @support_table_attribute_helpers.each do |attribute_name, defined_methods|
-          attribute_method_name = "#{method_name}_#{attribute_name}"
-          next if defined_methods.include?(attribute_method_name)
+      @support_table_attribute_helpers.each do |attribute_name, defined_methods|
+        attribute_method_name = "#{method_name}_#{attribute_name}"
+        next if defined_methods.include?(attribute_method_name)
 
-          define_support_table_instance_attribute_helper(attribute_method_name, attributes[attribute_name])
-          defined_methods << attribute_method_name
-        end
+        define_support_table_instance_attribute_helper(attribute_method_name, attributes[attribute_name])
+        defined_methods << attribute_method_name
       end
     end
 
