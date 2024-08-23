@@ -370,7 +370,8 @@ module SupportTableData
       # Eager load any classes defined in the default data directory by guessing class names
       # from the file names.
       if SupportTableData.data_directory && File.exist?(SupportTableData.data_directory) && File.directory?(SupportTableData.data_directory)
-        Dir.chdir(SupportTableData.data_directory) { Dir.glob(File.join("**", "*")) }.each do |file_name|
+        Dir.glob(File.join(SupportTableData.data_directory, "**", "*")).sort.each do |file_name|
+          file_name = file_name.delete_prefix("#{SupportTableData.data_directory}#{File::SEPARATOR}")
           class_name = file_name.sub(/\.[^.]*/, "").singularize.camelize
           class_name.safe_constantize
         end
