@@ -380,6 +380,7 @@ module SupportTableData
       active_record_classes = ActiveRecord::Base.descendants.reject { |klass| klass.name.nil? }
       active_record_classes.sort_by(&:name).each do |klass|
         next unless klass.include?(SupportTableData)
+        next unless klass.instance_variable_defined?(:@support_table_data_files) && klass.instance_variable_get(:@support_table_data_files).is_a?(Array)
         next if klass.abstract_class?
         next if classes.include?(klass)
         classes << klass
