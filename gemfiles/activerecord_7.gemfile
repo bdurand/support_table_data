@@ -9,6 +9,7 @@ gem "appraisal"
 gem "standard", "~>1.0"
 gem "pry-byebug"
 gem "yard"
+gem "csv"
 gem "activerecord", "~> 7.0"
 
 gemspec path: "../"

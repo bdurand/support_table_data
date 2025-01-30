@@ -57,6 +57,8 @@ You cannot update the value of the key attribute in a record in the data file. I
 
 You can specify data files as relative paths. This can be done by setting the `SupportTableData.data_directory` value. You can override this value for a model by setting the `support_table_data_directory` attribute on its class. In a Rails application, `SupportTableData.data_directory` will be automatically set to `db/support_tables/`. Otherwise, relative file paths will be resolved from the current working directory. You must define the directory to load relative files from before loading your model classes.
 
+**Note**: If you're using CSV files and Ruby 3.4 or higher, you'll need to include the `csv` gem in your Gemfile since it was removed from the standard library in Ruby 3.4.
+
 ### Named Instances
 
 You can also automatically define helper methods to load instances and determine if they match specific values. This allows you to add more natural ways of referencing specific records.
