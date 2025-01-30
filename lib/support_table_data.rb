@@ -49,7 +49,7 @@ module SupportTableData
             attributes&.each do |name, value|
               record.send(:"#{name}=", value) if record.respond_to?(:"#{name}=", true)
             end
-            if record.changed?
+            if support_table_record_changed?(record)
               changes << record.changes
               record.save!
             end
@@ -322,6 +322,20 @@ module SupportTableData
       end
 
       data
+    end
+
+    def support_table_record_changed?(record, seen = Set.new)
+      return true if record.changed?
+
+      seen << self
+      record.class.reflect_on_all_associations.detect do |reflection|
+        next false if reflection.belongs_to?
+        next false unless reflection.options[:autosave]
+
+        record.association(reflection.name).target.any? do |child|
+          support_table_record_changed?(child, seen) unless seen.include?(child)
+        end
+      end
     end
   end
 

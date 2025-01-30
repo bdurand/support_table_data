@@ -33,6 +33,15 @@ describe SupportTableData do
       expect(white.id).to eq 14
       expect(white.value).to eq 0xFFFFFF
     end
+
+    it "updates existing has many data if the association is autosaved" do
+      Hue.sync_table_data!
+      Group.sync_table_data!
+      Color.sync_table_data!
+      Color.find_by(name: "Dark Gray").aliases.destroy_all
+      Color.sync_table_data!
+      expect(Color.find_by(name: "Dark Gray").aliases.pluck(:name)).to match_array ["Gunmetal", "Charcoal"]
+    end
   end
 
   describe "sync_all!" do
