@@ -9,6 +9,12 @@ Gem::Specification.new do |spec|
   spec.homepage = "https://github.com/bdurand/support_table_data"
   spec.license = "MIT"
 
+  spec.metadata = {
+    "homepage_uri" => spec.homepage,
+    "source_code_uri" => spec.homepage,
+    "changelog_uri" => "#{spec.homepage}/blob/master/CHANGELOG.md"
+  }
+
   # Specify which files should be added to the gem when it is released.
   # The `git ls-files -z` loads the files in the RubyGem that have been added into git.
   ignore_files = %w[

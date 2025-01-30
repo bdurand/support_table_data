@@ -31,6 +31,11 @@ ActiveRecord::Base.connection.tap do |connection|
     t.string :name
   end
 
+  connection.create_table(:shade_hues) do |t|
+    t.integer :shade_id
+    t.integer :hue_id
+  end
+
   connection.create_table(:things) do |t|
     t.string :name
     t.integer :color_id
@@ -105,6 +110,15 @@ class Hue < ActiveRecord::Base
   def parent_name=(value)
     self.parent = Hue.find_by!(name: value)
   end
+
+  has_many :shade_hues
+  has_many :shades, through: :shade_hues
+
+  support_table_dependency "Shade"
+
+  def shade_names=(names)
+    self.shades = Shade.where(name: names)
+  end
 end
 
 class Shade < ActiveRecord::Base
@@ -115,6 +129,14 @@ class Shade < ActiveRecord::Base
   add_support_table_data "shades.yml"
 
   validates_uniqueness_of :name
+
+  has_many :shade_hues
+  has_many :hues, through: :shade_hues
+end
+
+class ShadeHue < ActiveRecord::Base
+  belongs_to :shade
+  belongs_to :hue
 end
 
 class Thing < ActiveRecord::Base

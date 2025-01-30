@@ -15,6 +15,7 @@ module SupportTableData
     @support_table_attribute_helpers = {}
     @support_table_instance_names = {}
     @support_table_instance_keys = nil
+    @support_table_dependencies = []
 
     # Define the attribute used as the key of the hash in the data files.
     # This should be a value that never changes. By default the key attribute will be the id.
@@ -203,6 +204,20 @@ module SupportTableData
       end
 
       @protected_keys.include?(instance[key_attribute].to_s)
+    end
+
+    # Explicitly define other support tables that this model depends on. A support table depends
+    # on another support table it needs to reference data on that table when loading its own data.
+    # Normally this is handled automatically by looking at the belongs_to associations on the model.
+    # In some cases, though, you may need to explicitly define the relationship. For instance, if
+    # there's a join table between two associations with the data poplulated from one support table's
+    # data file by referencing values maintained by the other support table. In this case,
+    # you need to define the dependency so that the tables are loaded in the correct order.
+    #
+    # @param class_names [String] List of class names that this support table depends on.
+    # @return [void]
+    def support_table_dependency(*class_names)
+      @support_table_dependencies += class_names.flatten.collect(&:to_s)
     end
 
     private
@@ -405,13 +420,17 @@ module SupportTableData
     #
     # @return [Array<Class>]
     def support_table_dependencies(klass)
-      dependencies = []
+      dependencies = klass.instance_variable_get(:@support_table_dependencies).collect(&:constantize)
 
       klass.reflections.values.each do |reflection|
         next if reflection.polymorphic?
         next unless reflection.klass.include?(SupportTableData)
         next if reflection.klass <= klass
         next unless reflection.belongs_to? || reflection.through_reflection?
+        next if dependencies.include?(reflection.klass)
+
+        explicit_dependencies = reflection.klass.instance_variable_get(:@support_table_dependencies)
+        next if explicit_dependencies&.include?(klass.name)
 
         dependencies << reflection.klass
       rescue => e

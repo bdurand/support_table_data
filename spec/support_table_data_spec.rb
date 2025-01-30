@@ -187,8 +187,8 @@ describe SupportTableData do
   end
 
   describe "support_table_classes" do
-    it "gets a list of all loaded support table classes with belongs to dependencies listed first" do
-      expect(SupportTableData.support_table_classes).to eq [Group, Hue, Shade, Color, Invalid]
+    it "gets a list of all loaded support table classes with dependencies listed first" do
+      expect(SupportTableData.support_table_classes).to eq [Shade, Group, Hue, Color, Invalid]
     end
   end
 
