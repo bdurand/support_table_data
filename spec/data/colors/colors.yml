@@ -3,6 +3,9 @@
   hex: "0x333333"
   group_name: "gray"
   hue_name: "gray"
+  alias_names:
+    - Charcoal
+    - Gunmetal
 
 - id: 9
   name: Purple

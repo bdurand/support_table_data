@@ -232,7 +232,7 @@ class Thing < ApplicationRecord
   add_support_table_data "things.yml"
 
   has_many :thing_widgets
-  has_many :widgets, through: :thing_widgets
+  has_many :widgets, through: :thing_widgets, autosave: true
 
   # The Thing model is responsible for loading the thing_widgets join table by means of the widget_names=
   # setter method. We need to define the depdenency to ensure widgets are loaded first.
@@ -243,6 +243,8 @@ class Thing < ApplicationRecord
   end
 end
 ```
+
+If you use a method to set a `has_many` association on your model, you **must** set the `autosave` option to `true` on the association (see the above example). This will ensure the association records are always saved even if there were no changes to the parent record.
 
 You need to call `SupportTableData.sync_all!` when deploying your application. This gem includes a rake task `support_table_data:sync` that is suitable for hooking into deploy scripts. An easy way to hook it into a Rails application is by enhancing the `db:migrate` task so that the sync task runs immediately after database migrations are run. You can do this by adding code to a Rakefile in your application's `lib/tasks` directory:
 

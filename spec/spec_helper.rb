@@ -42,6 +42,11 @@ ActiveRecord::Base.connection.tap do |connection|
     t.integer :shade_id
   end
 
+  connection.create_table(:aliases) do |t|
+    t.string :name
+    t.integer :color_id
+  end
+
   connection.create_table(:invalids) do |t|
     t.string :name
   end
@@ -61,6 +66,7 @@ class Color < ActiveRecord::Base
   belongs_to :hue
   has_many :things
   has_many :shades, through: :things
+  has_many :aliases, autosave: true
 
   # Intentionally invalid association
   belongs_to :non_existent, class_name: "NonExistent"
@@ -75,11 +81,21 @@ class Color < ActiveRecord::Base
     self.hue = Hue.find_by!(name: value)
   end
 
+  def alias_names=(names)
+    self.aliases = names.map { |name| Alias.find_or_initialize_by(name: name) }
+  end
+
   private
 
   def hex=(value)
     self.value = value.to_i(16)
   end
+end
+
+class Alias < ActiveRecord::Base
+  belongs_to :color
+
+  validates_uniqueness_of :name
 end
 
 class Group < ActiveRecord::Base
@@ -112,7 +128,7 @@ class Hue < ActiveRecord::Base
   end
 
   has_many :shade_hues
-  has_many :shades, through: :shade_hues
+  has_many :shades, through: :shade_hues, autosave: true
 
   support_table_dependency "Shade"
 
