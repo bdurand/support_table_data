@@ -212,7 +212,35 @@ Loading data is done inside a database transaction. No changes will be persisted
 
 You can synchronize the data in all models by calling `SupportTableData.sync_all!`. This method will discover all ActiveRecord models that include `SupportTableData` and synchronize each of them. (Note that there can be issues discovering all support table models in a Rails application if eager loading is turned off.) The discovery mechanism will try to detect unloaded classes by looking at the file names in the support table data directory so it's best to stick to standard Rails naming conventions for your data files.
 
-The load order for models will resolve any dependencies between models. So if one model has a `belongs_to` association with another model, then the belongs to model will be loaded first.
+The load order for models will resolve any dependencies between models. So if one model has a `belongs_to` association with another model, then the belongs to model will be loaded first. You can also explicitly define dependencies with the `support_table_dependency` method. If you have a join table between support tables that creates a circular dependency, then you will need to define which model to load first.
+
+```ruby
+class Widget < ApplicationRecord
+  include SupportTableData
+
+  add_support_table_data "widgets.yml"
+
+  has_many :thing_widgets
+  has_many :things, through: :thing_widgets
+end
+
+class Thing < ApplicationRecord
+  include SupportTableData
+
+  add_support_table_data "things.yml"
+
+  has_many :thing_widgets
+  has_many :widgets, through: :thing_widgets
+
+  # The Thing model is responsible for loading the thing_widgets join table by means of the widget_names=
+  # setter method. We need to define the depdenency to ensure widgets are loaded first.
+  support_table_dependency "Widget"
+
+  def widget_names=(widget_names)
+    self.widgets = Widget.where(name: widget_names)
+  end
+end
+```
 
 You need to call `SupportTableData.sync_all!` when deploying your application. This gem includes a rake task `support_table_data:sync` that is suitable for hooking into deploy scripts. An easy way to hook it into a Rails application is by enhancing the `db:migrate` task so that the sync task runs immediately after database migrations are run. You can do this by adding code to a Rakefile in your application's `lib/tasks` directory:
 

@@ -1,5 +1,6 @@
 red:
   name: red
+  shade_names: [light, dark]
 
 blue:
   name: blue
@@ -9,6 +10,7 @@ green:
 
 yellow:
   name: yellow
+  shade_names: [light]
 
 gray:
   name: gray
