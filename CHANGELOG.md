@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-- Removed support for ActiveRecord versions prior to 6.0.
+- Removed support for ActiveRecord versions prior to 6.1.
 
 ## 1.3.1
 
