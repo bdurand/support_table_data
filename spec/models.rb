@@ -171,6 +171,8 @@ class Polygon < ActiveRecord::Base
 
   self.support_table_key_attribute = :name
 
+  add_support_table_data "polygons.yml"
+
   validates :name, uniqueness: true
 end
 

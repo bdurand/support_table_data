@@ -43,6 +43,12 @@ describe SupportTableData do
       expect(Color.find_by(name: "Dark Gray").aliases.pluck(:name)).to match_array ["Gunmetal", "Charcoal"]
     end
 
+    it "creates records with the correct single table inheritance type" do
+      Polygon.sync_table_data!
+      expect(Polygon.triangle).to be_a Triangle
+      expect(Polygon.rectangle).to be_a Rectangle
+      expect(Polygon.pentagon).to be_a Polygon
+    end
     it "honors the single table inheritance column when creating new records" do
       allow(Polygon).to receive(:support_table_data).and_return([
         {"name" => "Triangle", "type" => "Triangle", "side_count" => 4}
