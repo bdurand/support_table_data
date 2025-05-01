@@ -10,6 +10,6 @@ gem "standard", "~>1.0"
 gem "pry-byebug"
 gem "yard"
 gem "csv"
-gem "activerecord", "~> 8.0"
+gem "activerecord", "~> 8.0.0"
 
 gemspec path: "../"
