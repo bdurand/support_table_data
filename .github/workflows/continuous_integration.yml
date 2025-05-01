@@ -36,7 +36,7 @@ jobs:
           - ruby: "2.7"
             appraisal: "activerecord_7.0"
           - ruby: "2.5"
-            appraisal: "activerecord_6"
+            appraisal: "activerecord_6.1"
     steps:
     - uses: actions/checkout@v4
     - name: Set up Ruby ${{ matrix.ruby }}

@@ -8,11 +8,13 @@ end
 appraise "activerecord_7.2" do
   gem "activerecord", "~> 7.0.0"
   gem "sqlite3", "~> 1.4.0"
+  gem "concurrent-ruby", "1.3.4"
 end
 
 appraise "activerecord_7.1" do
   gem "activerecord", "~> 7.0.0"
   gem "sqlite3", "~> 1.4.0"
+  gem "concurrent-ruby", "1.3.4"
 end
 
 appraise "activerecord_7.0" do
