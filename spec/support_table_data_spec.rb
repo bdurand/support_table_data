@@ -42,6 +42,13 @@ describe SupportTableData do
       Color.sync_table_data!
       expect(Color.find_by(name: "Dark Gray").aliases.pluck(:name)).to match_array ["Gunmetal", "Charcoal"]
     end
+
+    it "honors the single table inheritance column when creating new records" do
+      allow(Polygon).to receive(:support_table_data).and_return([
+        {"name" => "Triangle", "type" => "Triangle", "side_count" => 4}
+      ])
+      expect { Polygon.sync_table_data! }.to raise_error(ActiveRecord::RecordInvalid)
+    end
   end
 
   describe "sync_all!" do
@@ -197,7 +204,7 @@ describe SupportTableData do
 
   describe "support_table_classes" do
     it "gets a list of all loaded support table classes with dependencies listed first" do
-      expect(SupportTableData.support_table_classes).to eq [Shade, Group, Hue, Color, Invalid]
+      expect(SupportTableData.support_table_classes).to eq [Shade, Group, Hue, Color, Invalid, Polygon]
     end
   end
 

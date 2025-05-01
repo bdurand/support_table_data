@@ -56,7 +56,9 @@ module SupportTableData
           end
 
           canonical_data.each_value do |attributes|
-            record = new
+            class_name = attributes[inheritance_column]
+            klass = class_name ? sti_class_for(class_name) : self
+            record = klass.new
             attributes.each do |name, value|
               record.send(:"#{name}=", value) if record.respond_to?(:"#{name}=", true)
             end
