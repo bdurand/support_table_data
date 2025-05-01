@@ -28,9 +28,13 @@ jobs:
           - ruby: "ruby"
             standardrb: true
           - ruby: "3.4"
-            appraisal: "activerecord_8"
+            appraisal: "activerecord_8.0"
+          - ruby: "3.2"
+            appraisal: "activerecord_7.2"
           - ruby: "3.0"
-            appraisal: "activerecord_7"
+            appraisal: "activerecord_7.1"
+          - ruby: "2.7"
+            appraisal: "activerecord_7.0"
           - ruby: "2.5"
             appraisal: "activerecord_6"
     steps:
