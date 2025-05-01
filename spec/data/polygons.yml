@@ -1,0 +1,13 @@
+triangle:
+  name: Triangle
+  type: Triangle
+  side_count: 3
+
+rectangle:
+  name: Rectangle
+  type: Rectangle
+  side_count: 4
+
+pentagon:
+  name: Pentagon
+  side_count: 5
