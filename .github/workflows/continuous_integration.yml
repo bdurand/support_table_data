@@ -28,6 +28,8 @@ jobs:
           - ruby: "ruby"
             standardrb: true
             yard: true
+          - ruby: "4.0"
+            appraisal: "activerecord_8.1"
           - ruby: "3.4"
             appraisal: "activerecord_8.0"
           - ruby: "3.2"

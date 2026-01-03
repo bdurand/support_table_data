@@ -1,0 +1,19 @@
+pending:
+  code: pending
+  name: Pending
+
+active:
+  code: active
+  name: Active
+
+completed:
+  code: completed
+  name: Completed
+
+canceled:
+  code: canceled
+  name: Canceled
+
+failed:
+  code: failed
+  name: Failed
