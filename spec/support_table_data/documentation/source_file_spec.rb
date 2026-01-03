@@ -33,8 +33,8 @@ RSpec.describe SupportTableData::Documentation::SourceFile do
         end
       RUBY
 
-      allow(File).to receive(:read).and_return(source_with_docs)
       source_file = SupportTableData::Documentation::SourceFile.new(Color, color_path)
+      allow(source_file).to receive(:source).and_return(source_with_docs)
 
       result = source_file.source_without_yard_docs
 
@@ -47,8 +47,8 @@ RSpec.describe SupportTableData::Documentation::SourceFile do
 
     it "preserves trailing newline if present in original" do
       source_with_newline = "class Color\nend\n"
-      allow(File).to receive(:read).and_return(source_with_newline)
       source_file = SupportTableData::Documentation::SourceFile.new(Color, color_path)
+      allow(source_file).to receive(:source).and_return(source_with_newline)
 
       result = source_file.source_without_yard_docs
 
@@ -57,8 +57,8 @@ RSpec.describe SupportTableData::Documentation::SourceFile do
 
     it "preserves no trailing newline if absent in original" do
       source_without_newline = "class Color\nend"
-      allow(File).to receive(:read).and_return(source_without_newline)
       source_file = SupportTableData::Documentation::SourceFile.new(Color, color_path)
+      allow(source_file).to receive(:source).and_return(source_without_newline)
 
       result = source_file.source_without_yard_docs
 
@@ -90,8 +90,8 @@ RSpec.describe SupportTableData::Documentation::SourceFile do
 
     it "preserves trailing newline from original file" do
       source_with_newline = "class Color\nend\n"
-      allow(File).to receive(:read).and_return(source_with_newline)
       source_file = SupportTableData::Documentation::SourceFile.new(Color, color_path)
+      allow(source_file).to receive(:source).and_return(source_with_newline)
 
       result = source_file.source_with_yard_docs
 
@@ -100,8 +100,8 @@ RSpec.describe SupportTableData::Documentation::SourceFile do
 
     it "preserves no trailing newline if absent in original" do
       source_without_newline = "class Color\nend"
-      allow(File).to receive(:read).and_return(source_without_newline)
       source_file = SupportTableData::Documentation::SourceFile.new(Color, color_path)
+      allow(source_file).to receive(:source).and_return(source_without_newline)
 
       result = source_file.source_with_yard_docs
 
@@ -122,8 +122,8 @@ RSpec.describe SupportTableData::Documentation::SourceFile do
         end
       RUBY
 
-      allow(File).to receive(:read).and_return(source_with_old_docs)
       source_file = SupportTableData::Documentation::SourceFile.new(Color, color_path)
+      allow(source_file).to receive(:source).and_return(source_with_old_docs)
 
       result = source_file.source_with_yard_docs
 
@@ -149,8 +149,8 @@ RSpec.describe SupportTableData::Documentation::SourceFile do
         end
       RUBY
 
-      allow(File).to receive(:read).and_return(source_with_inline_docs)
       source_file = SupportTableData::Documentation::SourceFile.new(Color, color_path)
+      allow(source_file).to receive(:source).and_return(source_with_inline_docs)
 
       result = source_file.source_with_yard_docs
 
@@ -175,8 +175,8 @@ RSpec.describe SupportTableData::Documentation::SourceFile do
         end
       RUBY
 
-      allow(File).to receive(:read).and_return(source_with_indented_docs)
       source_file = SupportTableData::Documentation::SourceFile.new(Color, color_path)
+      allow(source_file).to receive(:source).and_return(source_with_indented_docs)
 
       result = source_file.source_with_yard_docs
 
@@ -204,8 +204,8 @@ RSpec.describe SupportTableData::Documentation::SourceFile do
         end
       RUBY
 
-      allow(File).to receive(:read).and_return(source_without_docs)
       source_file = SupportTableData::Documentation::SourceFile.new(Color, color_path)
+      allow(source_file).to receive(:source).and_return(source_without_docs)
 
       expect(source_file.yard_docs_up_to_date?).to be false
     end
@@ -223,8 +223,8 @@ RSpec.describe SupportTableData::Documentation::SourceFile do
         end
       RUBY
 
-      allow(File).to receive(:read).and_return(source_with_old_docs)
       source_file = SupportTableData::Documentation::SourceFile.new(Color, color_path)
+      allow(source_file).to receive(:source).and_return(source_with_old_docs)
 
       expect(source_file.yard_docs_up_to_date?).to be false
     end
