@@ -55,7 +55,9 @@ class Status < ApplicationRecord
 
 You cannot update the value of the key attribute in a record in the data file. If you do, a new record will be created and the existing record will be left unchanged.
 
-You can specify data files as relative paths. This can be done by setting the `SupportTableData.data_directory` value. You can override this value for a model by setting the `support_table_data_directory` attribute on its class. In a Rails application, `SupportTableData.data_directory` will be automatically set to `db/support_tables/`. Otherwise, relative file paths will be resolved from the current working directory. You must define the directory to load relative files from before loading your model classes.
+You can specify data files as relative paths. This can be done by setting the `SupportTableData.data_directory` value. You can override this value for a model by setting the `support_table_data_directory` attribute on its class. Otherwise, relative file paths will be resolved from the current working directory. You must define the directory to load relative files from before loading your model classes.
+
+In a Rails application, `SupportTableData.data_directory` will be automatically set to `db/support_tables/`. This can be overridden by setting the `config.support_table_data_directory` option in the Rails application configuration.
 
 **Note**: If you're using CSV files and Ruby 3.4 or higher, you'll need to include the `csv` gem in your Gemfile since it was removed from the standard library in Ruby 3.4.
 
@@ -108,7 +110,6 @@ status.completed?   # status.id == 3
 Helper methods will not override already defined methods on a model class. If a method is already defined, an `ArgumentError` will be raised.
 
 You can also define helper methods for named instance attributes. These helper methods will return the hard coded values from the data file. Calling these methods does not require a database connection.
-
 
 ```ruby
 class Status < ApplicationRecord
@@ -170,6 +171,19 @@ completed:
   name: Completed
   group_name: done
 ```
+
+#### Documenting Named Instance Helpers
+
+In a Rails application, you can add YARD documentation for the named instance helpers by running the rake task `support_table_data:add_yard_docs`. This will add YARD comments to your model classes for each of the named instance helper methods defined on the model. Adding this documentation will help IDEs provide better code completion and inline documentation for the helper methods and expose the methods to AI agents.
+
+The default behavior is to add the documentation commnts at the end of the model class by reopening the class definition. If you prefer to have the documentation comments appear elsewhere in the file, you can add the following markers to your model class and the YARD documentation will be inserted between these markers.
+
+```ruby
+# Begin YARD docs for support_table_data
+# End YARD docs for support_table_data
+```
+
+A good practice is to add a check to your CI pipeline to ensure the documentation is always up to date.
 
 ### Caching
 

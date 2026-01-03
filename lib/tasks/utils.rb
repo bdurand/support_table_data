@@ -18,6 +18,25 @@ module SupportTableData
           end
         end
 
+        # Return a hash mapping all models that include SupportTableData to their source file paths.
+        #
+        # @return [Array<SupportTableData::Documentation::SourceFile>]
+        def support_table_sources
+          sources = []
+
+          ActiveRecord::Base.descendants.each do |klass|
+            next unless klass.included_modules.include?(SupportTableData)
+            next if klass.instance_names.empty?
+
+            file_path = SupportTableData::Tasks::Utils.model_file_path(klass)
+            next unless file_path&.file? && file_path.readable?
+
+            sources << Documentation::SourceFile.new(klass, file_path)
+          end
+
+          sources
+        end
+
         def model_file_path(klass)
           file_path = "#{klass.name.underscore}.rb"
           model_path = nil
