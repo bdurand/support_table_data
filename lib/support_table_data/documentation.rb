@@ -25,9 +25,9 @@ module SupportTableData
     # @return [String] The YARD comment text
     def instance_helper_yard_doc(name)
       <<~YARD
-        # Find the #{name} record from the database.
+        # Find the named instance record +#{name}+ from the database.
         #
-        # @return [#{klass.name}] the #{name} record
+        # @return [#{klass.name}] the +#{name}+ record
         # @raise [ActiveRecord::RecordNotFound] if the record does not exist
         # @!method self.#{name}
       YARD
@@ -39,9 +39,9 @@ module SupportTableData
     # @return [String] The YARD comment text
     def predicate_helper_yard_doc(name)
       <<~YARD
-        # Check if this record is the #{name} record.
+        # Check if this record is the +#{name}+ record.
         #
-        # @return [Boolean] true if this is the #{name} record, false otherwise
+        # @return [Boolean] true if this is the +#{name}+ record, false otherwise
         # @!method #{name}?
       YARD
     end
@@ -52,10 +52,10 @@ module SupportTableData
     # @return [String] The YARD comment text
     def attribute_helper_yard_doc(name, attribute_name)
       <<~YARD
-        # Get the #{name} record's #{attribute_name}.
+        # Get the #{attribute_name} attribute of the +#{name}+ record.
         #
-        # @return [Object] the #{name} record's #{attribute_name}
-        # @!method #{name}_#{attribute_name}
+        # @return [Object] the +#{name}+ record's #{attribute_name}
+        # @!method self.#{name}_#{attribute_name}
       YARD
     end
 
