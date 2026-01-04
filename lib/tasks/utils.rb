@@ -26,7 +26,7 @@ module SupportTableData
 
           ActiveRecord::Base.descendants.each do |klass|
             next unless klass.included_modules.include?(SupportTableData)
-            
+
             begin
               next if klass.instance_names.empty?
             rescue NoMethodError
