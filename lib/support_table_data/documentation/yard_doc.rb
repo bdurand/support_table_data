@@ -3,7 +3,7 @@
 module SupportTableData
   module Documentation
     class YardDoc
-      # @param config_class [Class] The configuration class to generate documentation for
+      # @param klass [Class] The model class to generate documentation for
       def initialize(klass)
         @klass = klass
       end
@@ -70,7 +70,7 @@ module SupportTableData
         yard_lines = ["# @!group Named Instances"]
 
         # Generate docs for each named instance
-        instance_names.sort.each do |name, index|
+        instance_names.sort.each do |name|
           yard_lines << ""
           yard_lines << instance_helper_yard_doc(name)
           yard_lines << ""
