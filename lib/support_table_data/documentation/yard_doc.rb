@@ -70,7 +70,7 @@ module SupportTableData
         yard_lines = ["# @!group Named Instances"]
 
         # Generate docs for each named instance
-        instance_names.sort.each do |name, index|
+        instance_names.sort.each do |name|
           yard_lines << ""
           yard_lines << instance_helper_yard_doc(name)
           yard_lines << ""
