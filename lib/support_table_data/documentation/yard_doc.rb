@@ -3,7 +3,7 @@
 module SupportTableData
   module Documentation
     class YardDoc
-      # @param config_class [Class] The configuration class to generate documentation for
+      # @param klass [Class] The model class to generate documentation for
       def initialize(klass)
         @klass = klass
       end
