@@ -26,7 +26,13 @@ module SupportTableData
 
           ActiveRecord::Base.descendants.each do |klass|
             next unless klass.included_modules.include?(SupportTableData)
-            next if klass.instance_names.empty?
+            
+            begin
+              next if klass.instance_names.empty?
+            rescue NoMethodError
+              # Skip models where instance_names is not properly initialized
+              next
+            end
 
             file_path = SupportTableData::Tasks::Utils.model_file_path(klass)
             next unless file_path&.file? && file_path.readable?
