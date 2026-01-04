@@ -176,7 +176,7 @@ completed:
 
 In a Rails application, you can add YARD documentation for the named instance helpers by running the rake task `support_table_data:add_yard_docs`. This will add YARD comments to your model classes for each of the named instance helper methods defined on the model. Adding this documentation will help IDEs provide better code completion and inline documentation for the helper methods and expose the methods to AI agents.
 
-The default behavior is to add the documentation commnts at the end of the model class by reopening the class definition. If you prefer to have the documentation comments appear elsewhere in the file, you can add the following markers to your model class and the YARD documentation will be inserted between these markers.
+The default behavior is to add the documentation comments at the end of the model class by reopening the class definition. If you prefer to have the documentation comments appear elsewhere in the file, you can add the following markers to your model class and the YARD documentation will be inserted between these markers.
 
 ```ruby
 # Begin YARD docs for support_table_data
