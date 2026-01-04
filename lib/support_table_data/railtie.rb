@@ -5,7 +5,7 @@ module SupportTableData
     config.support_table_data_directory = "db/support_tables"
 
     initializer "support_table_data" do |app|
-      SupportTableData.data_directory ||= app.config.support_table_data_directory
+      SupportTableData.data_directory ||= app.root.join(app.config.support_table_data_directory).to_s
     end
 
     rake_tasks do
