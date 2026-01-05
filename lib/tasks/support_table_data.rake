@@ -3,18 +3,9 @@
 namespace :support_table_data do
   desc "Syncronize data for all models that include SupportTableData."
   task sync: :environment do
-    # Eager load models if we are in a Rails enviroment with eager loading turned off.
-    if defined?(Rails.application)
-      unless Rails.application.config.eager_load
-        if defined?(Rails.application.eager_load!)
-          Rails.application.eager_load!
-        elsif defined?(Rails.autoloaders.zeitwerk_enabled?) && Rails.autoloaders.zeitwerk_enabled?
-          Rails.autoloaders.each(&:eager_load)
-        else
-          warn "Could not eager load models; some support table data may not load"
-        end
-      end
-    end
+    require_relative "utils"
+
+    SupportTableData::Tasks::Utils.eager_load!
 
     logger_callback = lambda do |name, started, finished, unique_id, payload|
       klass = payload[:class]
@@ -29,6 +20,20 @@ namespace :support_table_data do
 
     ActiveSupport::Notifications.subscribed(logger_callback, "support_table_data.sync") do
       SupportTableData.sync_all!
+    end
+  end
+
+  desc "Adds YARD documentation comments to models to document the named instance methods."
+  task add_yard_docs: :environment do
+    require_relative "../support_table_data/documentation"
+    require_relative "utils"
+
+    SupportTableData::Tasks::Utils.eager_load!
+    SupportTableData::Tasks::Utils.support_table_sources.each do |source_file|
+      next if source_file.yard_docs_up_to_date?
+
+      source_file.path.write(source_file.source_with_yard_docs)
+      puts "Added YARD documentation to #{source_file.klass.name}."
     end
   end
 end

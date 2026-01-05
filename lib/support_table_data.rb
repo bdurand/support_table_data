@@ -8,6 +8,8 @@
 module SupportTableData
   extend ActiveSupport::Concern
 
+  @data_directory = nil
+
   included do
     # Internal variables used for memoization.
     @mutex = Mutex.new
@@ -342,19 +344,17 @@ module SupportTableData
   end
 
   class << self
-    # Specify the default directory for data files.
-    attr_writer :data_directory
+    # @attribute [r]
+    #   The the default directory where data files live.
+    #   @return [String, nil]
+    attr_reader :data_directory
 
-    # The directory where data files live by default. If you are running in a Rails environment,
-    # then this will be `db/support_tables`. Otherwise, the current working directory will be used.
+    # Set the default directory where data files live.
     #
-    # @return [String]
-    def data_directory
-      if defined?(@data_directory)
-        @data_directory
-      elsif defined?(Rails.root)
-        Rails.root.join("db", "support_tables").to_s
-      end
+    # @param value [String, Pathname, nil] The path to the directory.
+    # @return [void]
+    def data_directory=(value)
+      @data_directory = value&.to_s
     end
 
     # Sync all support table classes. Classes must already be loaded in order to be synced.
