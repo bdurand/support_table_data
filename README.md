@@ -8,6 +8,19 @@ This gem provides a mixin for ActiveRecord support table models that allows you 
 
 These kinds of models blur the line between data and code. You'll often end up with constants and application logic based on specific values that need to exist in the table. By using this gem, you can easily define methods for loading and comparing specific instances. This can give you cleaner code that reads far more naturally. You can also avoid defining dozens of constants or referencing magic values (i.e. no more hard-coded strings or ids in the code to look up specific records).
 
+## Table of Contents
+
+- [Usage](#usage)
+  - [Specifying Data Files](#specifying-data-files)
+  - [Named Instances](#named-instances)
+    - [Documenting Named Instance Helpers](#documenting-named-instance-helpers)
+  - [Caching](#caching)
+  - [Loading Data](#loading-data)
+  - [Testing](#testing)
+- [Installation](#installation)
+- [Contributing](#contributing)
+- [License](#license)
+
 ## Usage
 
 In the examples below, suppose we have a simple `Status` model in which each row has an id and a name, and the name can only have a handful of statuses: "Pending", "In Progress", and "Completed".
@@ -211,6 +224,9 @@ class Thing < ApplicationRecord
   cache_belongs_to :status
 end
 ```
+
+> ![TIP]
+> The [support_table](https://github.com/bdurand/support_table) gem combines both gems in a drop in solution for Rails applications.
 
 ### Loading Data
 
