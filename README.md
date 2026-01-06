@@ -57,7 +57,7 @@ You cannot update the value of the key attribute in a record in the data file. I
 
 You can specify data files as relative paths. This can be done by setting the `SupportTableData.data_directory` value. You can override this value for a model by setting the `support_table_data_directory` attribute on its class. Otherwise, relative file paths will be resolved from the current working directory. You must define the directory to load relative files from before loading your model classes.
 
-In a Rails application, `SupportTableData.data_directory` will be automatically set to `db/support_tables/`. This can be overridden by setting the `config.support_table_data_directory` option in the Rails application configuration.
+In a Rails application, `SupportTableData.data_directory` will be automatically set to `db/support_tables/`. This can be overridden by setting the `config.support_table.data_directory` option in the Rails application configuration.
 
 **Note**: If you're using CSV files and Ruby 3.4 or higher, you'll need to include the `csv` gem in your Gemfile since it was removed from the standard library in Ruby 3.4.
 
@@ -260,17 +260,32 @@ end
 
 If you use a method to set a `has_many` association on your model, you **must** set the `autosave` option to `true` on the association (see the above example). This will ensure the association records are always saved even if there were no changes to the parent record.
 
-You need to call `SupportTableData.sync_all!` when deploying your application. This gem includes a rake task `support_table_data:sync` that is suitable for hooking into deploy scripts. An easy way to hook it into a Rails application is by enhancing the `db:migrate` task so that the sync task runs immediately after database migrations are run. You can do this by adding code to a Rakefile in your application's `lib/tasks` directory:
+You will need to call `SupportTableData.sync_all!` when deploying your application or running your test suite. This gem includes a rake task `support_table_data:sync` that is suitable for hooking into deploy or CI scripts.
+
+This task is automatically run whenever you run any of these Rails tasks so if these are already part of you deploy or CI scripts, then no additional setup is required:
+
+- `db:seed`
+- `db:seed:replant`
+- `db:prepare`
+- `db:test:prepare`
+- `db:fixtures:load`
+
+You can disable these task enhancements by setting `config.support_table.auto_sync = false` in your Rails application configuration.
+
+> ![TIP]
+> If you also want to hook into the `db:migrate` task so that syncs are run immediately after database migrations, you can do this by adding code to a Rakefile in your application's `lib/tasks` directory. Migrations do funny things with the database connection especially when using multiple databases so you need to re-establish the connection before syncing the support table data.
 
 ```ruby
 if Rake::Task.task_defined?("db:migrate")
   Rake::Task["db:migrate"].enhance do
+    # The main database connection may have artifacts from the migration, so re-establish it
+    # to get a clean connection before syncing support table data.
+    ActiveRecord::Base.establish_connection
+
     Rake::Task["support_table_data:sync"].invoke
   end
 end
 ```
-
-Enhancing the `db:migrate` task also ensures that local development environments will stay up to date.
 
 ### Testing
 

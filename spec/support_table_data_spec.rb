@@ -49,11 +49,19 @@ describe SupportTableData do
       expect(Polygon.rectangle).to be_a Rectangle
       expect(Polygon.pentagon).to be_a Polygon
     end
+
     it "honors the single table inheritance column when creating new records" do
       allow(Polygon).to receive(:support_table_data).and_return([
         {"name" => "Triangle", "type" => "Triangle", "side_count" => 4}
       ])
-      expect { Polygon.sync_table_data! }.to raise_error(ActiveRecord::RecordInvalid)
+      expect { Polygon.sync_table_data! }.to raise_error(SupportTableData::ValidationError)
+    end
+
+    it "reraises validation errors with more context" do
+      allow(Color).to receive(:support_table_data).and_return([
+        {"id" => 20, "name" => nil, "hex" => "0x123456"}
+      ])
+      expect { Color.sync_table_data! }.to raise_error(SupportTableData::ValidationError, /Validation failed for Color with id: 20 - Name can't be blank/)
     end
   end
 

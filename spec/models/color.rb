@@ -19,7 +19,7 @@ class Color < ActiveRecord::Base
   # Intentionally invalid association
   belongs_to :non_existent, class_name: "NonExistent"
 
-  validates_uniqueness_of :name
+  validates :name, presence: true, uniqueness: true
 
   def group_name=(value)
     self.group = Group.named_instance(value)
