@@ -36,4 +36,26 @@ namespace :support_table_data do
       puts "Added YARD documentation to #{source_file.klass.name}."
     end
   end
+
+  desc "Verify that all the support table models have up to date YARD documentation for named instance methods."
+  task verify_yard_docs: :environment do
+    require_relative "../support_table_data/documentation"
+    require_relative "utils"
+
+    SupportTableData::Tasks::Utils.eager_load!
+
+    all_up_to_date = true
+    SupportTableData::Tasks::Utils.support_table_sources.each do |source_file|
+      unless source_file.yard_docs_up_to_date?
+        puts "YARD documentation is not up to date for #{source_file.klass.name}."
+        all_up_to_date = false
+      end
+    end
+
+    if all_up_to_date
+      puts "All support table models have up to date YARD documentation."
+    else
+      raise
+    end
+  end
 end

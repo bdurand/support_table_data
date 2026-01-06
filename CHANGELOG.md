@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - The default data directory in a Rails application can be set with the `config.support_table.data_directory` option in the Rails application configuration.
-- Added rake task `support_table_data:add_yard_docs` for Rails applications that will add YARD documentation to support table models for the named instance helpers.
+- Added rake task `support_table_data:add_yard_docs` for Rails applications that will add YARD documentation to support table models for the named instance helpers. There is also a task `support_table_data:verify_yard_docs` that can be used in a build pipeline to verify that the documentation is up to date.
 - The data synchronization task is now automatically attached to several Rails tasks: `db:seed`, `db:seed:replant`, `db:prepare`, `db:test:prepare`, `db:fixtures:load`. Support tables will be synced after running any of these tasks. This can be disabled by setting `config.support_table.auto_sync = false` in the Rails application configuration.
 
 ### Changed

@@ -196,7 +196,7 @@ The default behavior is to add the documentation comments at the end of the mode
 # End YARD docs for support_table_data
 ```
 
-A good practice is to add a check to your CI pipeline to ensure the documentation is always up to date.
+A good practice is to add a check to your CI pipeline to ensure the documentation is always up to date. You can run the rake task `support_table_data:verify_yard_docs` to do this. It will exit with an error if any models do not have up to date documentation.
 
 ### Caching
 
