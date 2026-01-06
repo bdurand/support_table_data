@@ -225,7 +225,7 @@ class Thing < ApplicationRecord
 end
 ```
 
-> ![TIP]
+> [!TIP]
 > The [support_table](https://github.com/bdurand/support_table) gem combines both gems in a drop in solution for Rails applications.
 
 ### Loading Data
@@ -288,7 +288,7 @@ This task is automatically run whenever you run any of these Rails tasks so if t
 
 You can disable these task enhancements by setting `config.support_table.auto_sync = false` in your Rails application configuration.
 
-> ![TIP]
+> [!TIP]
 > If you also want to hook into the `db:migrate` task so that syncs are run immediately after database migrations, you can do this by adding code to a Rakefile in your application's `lib/tasks` directory. Migrations do funny things with the database connection especially when using multiple databases so you need to re-establish the connection before syncing the support table data.
 
 ```ruby
