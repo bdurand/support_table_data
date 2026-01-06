@@ -278,7 +278,7 @@ If you use a method to set a `has_many` association on your model, you **must** 
 
 You will need to call `SupportTableData.sync_all!` when deploying your application or running your test suite. This gem includes a rake task `support_table_data:sync` that is suitable for hooking into deploy or CI scripts.
 
-This task is automatically run whenever you run any of these Rails tasks so if these are already part of you deploy or CI scripts, then no additional setup is required:
+This task is automatically run whenever you run any of these Rails tasks so if these are already part of your deploy or CI scripts, then no additional setup is required:
 
 - `db:seed`
 - `db:seed:replant`
