@@ -87,7 +87,7 @@ Allows data files to reference related records by instance name instead of forei
 
 ### Key Attribute Configuration
 
-By default, uses model's `primary_key`. Override for non-id keys:
+By default, uses model's `id` column. Override for non-id keys:
 
 ```ruby
 self.support_table_key_attribute = :name  # Use 'name' instead of 'id'

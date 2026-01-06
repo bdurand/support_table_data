@@ -41,8 +41,11 @@ module SupportTableData
       self._support_table_key_attribute = attribute_name&.to_s
     end
 
+    # Get the attribute used as the unique to identify records in the data files.
+    #
+    # @return [String] The name of the key attribute.
     def support_table_key_attribute
-      _support_table_key_attribute || primary_key
+      _support_table_key_attribute || "id"
     end
 
     # Synchronize the rows in the table with the values defined in the data files added with
