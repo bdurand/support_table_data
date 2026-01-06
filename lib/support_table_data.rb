@@ -19,7 +19,7 @@ module SupportTableData
     @support_table_instance_keys = nil
     @support_table_dependencies = []
 
-    # Private class attritebute to hold the key attribute name. Use `support_table_key_attribute` instead.
+    # Private class attribute to hold the key attribute name. Use `support_table_key_attribute` instead.
     # @private
     class_attribute :_support_table_key_attribute, instance_accessor: false
     class << self
