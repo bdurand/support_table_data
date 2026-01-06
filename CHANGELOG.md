@@ -4,16 +4,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## 1.4.1
+## 1.5.0
 
 ### Added
 
-- The default data directory in a Rails application can be set with the `config.support_table_data_directory` option in the Rails application configuration.
+- The default data directory in a Rails application can be set with the `config.support_table.data_directory` option in the Rails application configuration.
 - Added rake task `support_table_data:add_yard_docs` for Rails applications that will add YARD documentation to support table models for the named instance helpers.
+- The data synchronization task is now automatically attached to several Rails tasks: `db:seed`, `db:seed:replant`, `db:prepare`, `db:test:prepare`, `db:fixtures:load`. Support tables will be synced after running any of these tasks. This can be disabled by setting `config.support_table.auto_sync = false` in the Rails application configuration.
 
 ### Changed
 
-- The default data directory is now set in a Railtie and can be overridden with the `config.support_table_data_directory` option in the Rails application configuration.
+- The default data directory is now set in a Railtie and can be overridden with the `config.support_table.data_directory` option in the Rails application configuration.
+- The `support_table_key_attribute` method now returns the primary key of the model if not explicitly set instead of implicitly interpreting `nil` as the primary key. This makes the behavior more consistent and explicit.
 
 ## 1.4.0
 

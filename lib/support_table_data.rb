@@ -19,9 +19,13 @@ module SupportTableData
     @support_table_instance_keys = nil
     @support_table_dependencies = []
 
-    # Define the attribute used as the key of the hash in the data files.
-    # This should be a value that never changes. By default the key attribute will be the id.
-    class_attribute :support_table_key_attribute, instance_accessor: false
+    # Private class attribute to hold the key attribute name. Use `support_table_key_attribute` instead.
+    # @private
+    class_attribute :_support_table_key_attribute, instance_accessor: false
+    class << self
+      private :_support_table_key_attribute=
+      private :_support_table_key_attribute
+    end
 
     # Define the directory where data files should be loaded from. This value will override the global
     # value set by SupportTableData.data_directory. This is only used if relative paths are passed
@@ -30,6 +34,17 @@ module SupportTableData
   end
 
   class_methods do
+    # Define the attribute used as the key of the hash in the data files.
+    # This should be an attribute with values that never change.
+    # By default the key attribute will be the table's primary key.
+    def support_table_key_attribute=(attribute_name)
+      self._support_table_key_attribute = attribute_name&.to_s
+    end
+
+    def support_table_key_attribute
+      _support_table_key_attribute || primary_key
+    end
+
     # Synchronize the rows in the table with the values defined in the data files added with
     # `add_support_table_data`. Note that rows will not be deleted if they are no longer in
     # the data files.
@@ -38,36 +53,41 @@ module SupportTableData
     def sync_table_data!
       return unless table_exists?
 
-      key_attribute = (support_table_key_attribute || primary_key).to_s
-      canonical_data = support_table_data.each_with_object({}) { |attributes, hash| hash[attributes[key_attribute].to_s] = attributes }
-      records = where(key_attribute => canonical_data.keys)
+      canonical_data = support_table_data.each_with_object({}) do |attributes, hash|
+        hash[attributes[support_table_key_attribute].to_s] = attributes
+      end
+      records = where(support_table_key_attribute => canonical_data.keys)
       changes = []
 
-      ActiveSupport::Notifications.instrument("support_table_data.sync", class: self) do
-        transaction do
-          records.each do |record|
-            key = record[key_attribute].to_s
-            attributes = canonical_data.delete(key)
-            attributes&.each do |name, value|
-              record.send(:"#{name}=", value) if record.respond_to?(:"#{name}=", true)
+      begin
+        ActiveSupport::Notifications.instrument("support_table_data.sync", class: self) do
+          transaction do
+            records.each do |record|
+              key = record[support_table_key_attribute].to_s
+              attributes = canonical_data.delete(key)
+              attributes&.each do |name, value|
+                record.send(:"#{name}=", value) if record.respond_to?(:"#{name}=", true)
+              end
+              if support_table_record_changed?(record)
+                changes << record.changes
+                record.save!
+              end
             end
-            if support_table_record_changed?(record)
+
+            canonical_data.each_value do |attributes|
+              class_name = attributes[inheritance_column]
+              klass = class_name ? sti_class_for(class_name) : self
+              record = klass.new
+              attributes.each do |name, value|
+                record.send(:"#{name}=", value) if record.respond_to?(:"#{name}=", true)
+              end
               changes << record.changes
               record.save!
             end
           end
-
-          canonical_data.each_value do |attributes|
-            class_name = attributes[inheritance_column]
-            klass = class_name ? sti_class_for(class_name) : self
-            record = klass.new
-            attributes.each do |name, value|
-              record.send(:"#{name}=", value) if record.respond_to?(:"#{name}=", true)
-            end
-            changes << record.changes
-            record.save!
-          end
         end
+      rescue ActiveRecord::RecordInvalid => e
+        raise SupportTableData::ValidationError.new(e.record)
       end
 
       changes
@@ -118,14 +138,12 @@ module SupportTableData
     # @return [Array<Hash>] List of attributes for all records in the data files.
     def support_table_data
       data = {}
-      key_attribute = (support_table_key_attribute || primary_key).to_s
-
       @support_table_data_files.each do |data_file_path|
         file_data = support_table_parse_data_file(data_file_path)
         file_data = file_data.values if file_data.is_a?(Hash)
         file_data = Array(file_data).flatten
         file_data.each do |attributes|
-          key_value = attributes[key_attribute].to_s
+          key_value = attributes[support_table_key_attribute].to_s
           existing = data[key_value]
           if existing
             existing.merge!(attributes)
@@ -173,9 +191,8 @@ module SupportTableData
     # @return [ActiveRecord::Base] The instance loaded from the database.
     # @raise [ActiveRecord::RecordNotFound] If the instance does not exist.
     def named_instance(instance_name)
-      key_attribute = (support_table_key_attribute || primary_key).to_s
       instance_name = instance_name.to_s
-      find_by!(key_attribute => @support_table_instance_names[instance_name])
+      find_by!(support_table_key_attribute => @support_table_instance_names[instance_name])
     end
 
     # Get the key values for all instances loaded from the data files.
@@ -183,13 +200,12 @@ module SupportTableData
     # @return [Array] List of all the key attribute values.
     def instance_keys
       if @support_table_instance_keys.nil?
-        key_attribute = (support_table_key_attribute || primary_key).to_s
         values = []
         support_table_data.each do |attributes|
-          key_value = attributes[key_attribute]
+          key_value = attributes[support_table_key_attribute]
           instance = new
-          instance.send(:"#{key_attribute}=", key_value)
-          values << instance.send(key_attribute)
+          instance.send(:"#{support_table_key_attribute}=", key_value)
+          values << instance.send(support_table_key_attribute)
         end
         @support_table_instance_keys = values.uniq
       end
@@ -200,14 +216,12 @@ module SupportTableData
     #
     # @return [Boolean]
     def protected_instance?(instance)
-      key_attribute = (support_table_key_attribute || primary_key).to_s
-
       unless defined?(@protected_keys)
-        keys = support_table_data.collect { |attributes| attributes[key_attribute].to_s }
+        keys = support_table_data.collect { |attributes| attributes[support_table_key_attribute].to_s }
         @protected_keys = keys
       end
 
-      @protected_keys.include?(instance[key_attribute].to_s)
+      @protected_keys.include?(instance[support_table_key_attribute].to_s)
     end
 
     # Explicitly define other support tables that this model depends on. A support table depends
@@ -251,12 +265,11 @@ module SupportTableData
         raise ArgumentError.new("Cannot define named instance #{method_name} on #{name}; name contains illegal characters")
       end
 
-      key_attribute = (support_table_key_attribute || primary_key).to_s
-      key_value = attributes[key_attribute]
+      key_value = attributes[support_table_key_attribute]
 
       unless @support_table_instance_names.include?(method_name)
-        define_support_table_instance_helper(method_name, key_attribute, key_value)
-        define_support_table_predicates_helper("#{method_name}?", key_attribute, key_value)
+        define_support_table_instance_helper(method_name, support_table_key_attribute, key_value)
+        define_support_table_predicates_helper("#{method_name}?", support_table_key_attribute, key_value)
         @support_table_instance_names = @support_table_instance_names.merge(method_name => key_value)
       end
 
@@ -466,6 +479,8 @@ module SupportTableData
     self.class.protected_instance?(self)
   end
 end
+
+require_relative "support_table_data/validation_error"
 
 if defined?(Rails::Railtie)
   require_relative "support_table_data/railtie"

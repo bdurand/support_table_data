@@ -1,3 +1,17 @@
 development:
-  adapter: sqlite3
-  database: db/development.sqlite3
+  primary:
+    adapter: sqlite3
+    database: db/development.sqlite3
+  secondary:
+    adapter: sqlite3
+    database: db/secondary_development.sqlite3
+    migrations_paths: db/secondary_migrate
+
+test:
+  primary:
+    adapter: sqlite3
+    database: db/test.sqlite3
+  secondary:
+    adapter: sqlite3
+    database: db/secondary_test.sqlite3
+    migrations_paths: db/secondary_migrate
