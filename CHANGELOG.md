@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - The default data directory is now set in a Railtie and can be overridden with the `config.support_table.data_directory` option in the Rails application configuration.
-- The `support_table_key_attribute` method now returns the primary key of the model if not explicitly set instead of implicitly interpreting `nil` as the primary key. This makes the behavior more consistent and explicit.
+- The `support_table_key_attribute` method now returns "id" if not explicitly set instead of implicitly interpreting `nil` as the primary key. This makes the behavior more consistent and explicit and avoids edge cases when running the code in environments where the database connection is not available. This is a breaking change if the table uses a primary key other than "id" and the `support_table_key_attribute` was not explicitly set to that primary key.
 
 ## 1.4.0
 
