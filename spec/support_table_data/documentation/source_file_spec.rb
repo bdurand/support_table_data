@@ -229,4 +229,38 @@ RSpec.describe SupportTableData::Documentation::SourceFile do
       expect(source_file.yard_docs_up_to_date?).to be false
     end
   end
+
+  describe "#has_yard_docs?" do
+    it "returns true when YARD docs are present" do
+      source_with_docs = <<~RUBY
+        class Color < ActiveRecord::Base
+          include SupportTableData
+
+          class Color
+            # Begin YARD docs for support_table_data
+            # Some YARD docs
+            # End YARD docs for support_table_data
+          end
+        end
+      RUBY
+
+      source_file = SupportTableData::Documentation::SourceFile.new(Color, color_path)
+      allow(source_file).to receive(:source).and_return(source_with_docs)
+
+      expect(source_file.has_yard_docs?).to be true
+    end
+
+    it "returns false when YARD docs are absent" do
+      source_without_docs = <<~RUBY
+        class Color < ActiveRecord::Base
+          include SupportTableData
+        end
+      RUBY
+
+      source_file = SupportTableData::Documentation::SourceFile.new(Color, color_path)
+      allow(source_file).to receive(:source).and_return(source_without_docs)
+
+      expect(source_file.has_yard_docs?).to be false
+    end
+  end
 end
