@@ -78,6 +78,13 @@ module SupportTableData
         source == source_with_yard_docs
       end
 
+      # Check if the source file has any YARD documentation added by support_table_data.
+      #
+      # @return [Boolean]
+      def has_yard_docs?
+        source.match?(YARD_COMMENT_REGEX)
+      end
+
       private
 
       def trailing_newline

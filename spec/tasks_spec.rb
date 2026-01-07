@@ -32,7 +32,7 @@ RSpec.describe "support_table_data rake tasks" do
     end
   end
 
-  describe "add_yard_docs" do
+  describe "yard_docs:add" do
     it "adds YARD documentation to models with named instances" do
       require_relative "../lib/support_table_data/documentation"
       require_relative "../lib/tasks/utils"
@@ -47,7 +47,7 @@ RSpec.describe "support_table_data rake tasks" do
       end
 
       # Run the task
-      Rake.application.invoke_task "support_table_data:add_yard_docs"
+      Rake.application.invoke_task "support_table_data:yard_docs:add"
 
       # Verify that at least one model had documentation added
       expect(written_files).not_to be_empty
@@ -61,7 +61,39 @@ RSpec.describe "support_table_data rake tasks" do
     end
   end
 
-  describe "verify_yard_docs" do
+  describe "yard_docs:remove" do
+    it "removes YARD documentation from models" do
+      require_relative "../lib/support_table_data/documentation"
+      require_relative "../lib/tasks/utils"
+
+      # Mock stdout to capture puts
+      allow($stdout).to receive(:puts)
+
+      # Track which files would be written to
+      written_files = []
+      allow_any_instance_of(Pathname).to receive(:write) do |instance, content|
+        written_files << {path: instance.to_s, content: content}
+      end
+
+      # Mock that files have YARD docs
+      allow_any_instance_of(SupportTableData::Documentation::SourceFile)
+        .to receive(:has_yard_docs?).and_return(true)
+
+      # Run the task
+      Rake.application.invoke_task "support_table_data:yard_docs:remove"
+
+      # Verify that files were written to
+      expect(written_files).not_to be_empty
+      expect($stdout).to have_received(:puts).at_least(:once)
+
+      # Verify the written content doesn't include YARD docs (check one example)
+      color_write = written_files.find { |f| f[:path].include?("color.rb") }
+      expect(color_write).not_to be_nil
+      expect(color_write[:content]).not_to include("# Begin YARD docs for support_table_data")
+    end
+  end
+
+  describe "yard_docs:verify" do
     it "verifies YARD documentation is up to date" do
       require_relative "../lib/support_table_data/documentation"
       require_relative "../lib/tasks/utils"
@@ -71,7 +103,7 @@ RSpec.describe "support_table_data rake tasks" do
         .to receive(:yard_docs_up_to_date?).and_return(true)
 
       # Run the task
-      Rake.application.invoke_task "support_table_data:verify_yard_docs"
+      Rake.application.invoke_task "support_table_data:yard_docs:verify"
 
       # Verify output indicates all docs are up to date
       expect($stdout).to have_received(:puts).with("All support table models have up to date YARD documentation.")
@@ -87,7 +119,7 @@ RSpec.describe "support_table_data rake tasks" do
 
       # Run the task and expect an error
       expect {
-        Rake.application.invoke_task "support_table_data:verify_yard_docs"
+        Rake.application.invoke_task "support_table_data:yard_docs:verify"
       }.to raise_error(RuntimeError)
 
       # Verify output indicates which docs are out of date
