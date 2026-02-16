@@ -9,6 +9,7 @@ module SupportTableData
       END_YARD_COMMENT = "# End YARD docs for support_table_data"
       YARD_COMMENT_REGEX = /^(?<indent>[ \t]*)#{BEGIN_YARD_COMMENT}.*^[ \t]*#{END_YARD_COMMENT}$/m
       CLASS_DEF_REGEX = /^[ \t]*class [a-zA-Z_0-9:]+.*?$/
+      UPDATE_COMMAND_COMMENT = "# To update these docs, run `bundle exec rake support_table_data:yard_docs`"
 
       # Initialize a new source file representation.
       #
@@ -53,6 +54,7 @@ module SupportTableData
 
           updated_source = source[0, existing_yard_docs.begin(0)]
           updated_source << "#{indent}#{BEGIN_YARD_COMMENT}\n"
+          updated_source << "#{indent}#{UPDATE_COMMAND_COMMENT}\n"
           updated_source << "#{indent}class #{klass.name}\n" if has_class_def
           updated_source << yard_docs
           updated_source << "\n#{indent}end" if has_class_def
@@ -62,6 +64,7 @@ module SupportTableData
         else
           yard_comments = <<~SOURCE.chomp("\n")
             #{BEGIN_YARD_COMMENT}
+            #{UPDATE_COMMAND_COMMENT}
             class #{klass.name}
             #{yard_docs.lines.map { |line| line.blank? ? "\n" : "  #{line}" }.join}
             end
