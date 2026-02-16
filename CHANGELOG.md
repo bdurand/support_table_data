@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.5.1
+
+### Added
+
+- YARD documentation tasks can now take an optional file path argument to add, verify, or remove documentation for a specific support table model instead of all models. For example, you can run `bundle exec rake support_table_data:yard_docs:add[app/models/color.rb]` to add documentation for the `Color` model.
+- Added comment in generated YARD documentation indicating the command to run to update them so that it's clear to users how to keep the documentation up to date.
+- Aliased `support_table_data:yard_docs` to `support_table_data:yard_docs:add` for convenience since adding the documentation is the most common action.
+
 ## 1.5.0
 
 ### Added

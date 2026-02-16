@@ -5,6 +5,7 @@ require "rake"
 
 RSpec.describe "support_table_data rake tasks" do
   let(:out) { StringIO.new }
+  let(:color_model_path) { File.join(__dir__, "models", "color.rb") }
 
   before do
     # Create a fresh Rake application for each test
@@ -59,6 +60,23 @@ RSpec.describe "support_table_data rake tasks" do
       expect(color_write[:content]).to include("# Begin YARD docs for support_table_data")
       expect(color_write[:content]).to include("@!method self.red")
     end
+
+    it "applies only to the specified file path when provided" do
+      require_relative "../lib/support_table_data/documentation"
+      require_relative "../lib/tasks/utils"
+
+      allow($stdout).to receive(:puts)
+
+      written_files = []
+      allow_any_instance_of(Pathname).to receive(:write) do |instance, content|
+        written_files << {path: instance.to_s, content: content}
+      end
+
+      Rake::Task["support_table_data:yard_docs:add"].invoke(color_model_path)
+
+      expect(written_files).not_to be_empty
+      expect(written_files.map { |f| f[:path] }.uniq).to eq([color_model_path])
+    end
   end
 
   describe "yard_docs:remove" do
@@ -90,6 +108,26 @@ RSpec.describe "support_table_data rake tasks" do
       color_write = written_files.find { |f| f[:path].include?("color.rb") }
       expect(color_write).not_to be_nil
       expect(color_write[:content]).not_to include("# Begin YARD docs for support_table_data")
+    end
+
+    it "applies only to the specified file path when provided" do
+      require_relative "../lib/support_table_data/documentation"
+      require_relative "../lib/tasks/utils"
+
+      allow($stdout).to receive(:puts)
+
+      written_files = []
+      allow_any_instance_of(Pathname).to receive(:write) do |instance, content|
+        written_files << {path: instance.to_s, content: content}
+      end
+
+      allow_any_instance_of(SupportTableData::Documentation::SourceFile)
+        .to receive(:has_yard_docs?).and_return(true)
+
+      Rake::Task["support_table_data:yard_docs:remove"].invoke(color_model_path)
+
+      expect(written_files).not_to be_empty
+      expect(written_files.map { |f| f[:path] }.uniq).to eq([color_model_path])
     end
   end
 
@@ -124,6 +162,20 @@ RSpec.describe "support_table_data rake tasks" do
 
       # Verify output indicates which docs are out of date
       expect($stdout).to have_received(:puts).at_least(:once)
+    end
+
+    it "verifies only the specified file path when provided" do
+      require_relative "../lib/support_table_data/documentation"
+      require_relative "../lib/tasks/utils"
+
+      allow($stdout).to receive(:puts)
+
+      expect_any_instance_of(SupportTableData::Documentation::SourceFile)
+        .to receive(:yard_docs_up_to_date?).once.and_return(true)
+
+      Rake::Task["support_table_data:yard_docs:verify"].invoke(color_model_path)
+
+      expect($stdout).to have_received(:puts).with("YARD documentation is up to date for #{color_model_path}.")
     end
   end
 end

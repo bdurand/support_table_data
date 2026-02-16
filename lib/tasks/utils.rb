@@ -18,14 +18,17 @@ module SupportTableData
           end
         end
 
-        # Return a hash mapping all models that include SupportTableData to their source file paths.
+        # Return all source files for models that include SupportTableData.
         #
+        # @param file_path [String, Pathname, nil] Optional file path to filter by.
         # @return [Array<SupportTableData::Documentation::SourceFile>]
-        def support_table_sources
+        def support_table_sources(file_path = nil)
+          require_relative file_path if file_path
+
           sources = []
 
           ActiveRecord::Base.descendants.each do |klass|
-            next unless klass.included_modules.include?(SupportTableData)
+            next unless klass.include?(SupportTableData)
 
             begin
               next if klass.instance_names.empty?
@@ -34,13 +37,18 @@ module SupportTableData
               next
             end
 
-            file_path = SupportTableData::Tasks::Utils.model_file_path(klass)
-            next unless file_path&.file? && file_path.readable?
+            model_file_path = SupportTableData::Tasks::Utils.model_file_path(klass)
+            next unless model_file_path&.file? && model_file_path.readable?
 
-            sources << Documentation::SourceFile.new(klass, file_path)
+            sources << Documentation::SourceFile.new(klass, model_file_path)
           end
 
-          sources
+          return sources if file_path.nil?
+
+          resolved_path = Pathname.new(file_path.to_s).expand_path
+          sources.select { |source| source.path.expand_path == resolved_path }
+        rescue ArgumentError
+          []
         end
 
         def model_file_path(klass)
