@@ -28,7 +28,7 @@ module SupportTableData
           sources = []
 
           ActiveRecord::Base.descendants.each do |klass|
-            next unless klass.included_modules.include?(SupportTableData)
+            next unless klass.include?(SupportTableData)
 
             begin
               next if klass.instance_names.empty?
