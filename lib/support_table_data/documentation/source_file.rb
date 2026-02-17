@@ -55,9 +55,11 @@ module SupportTableData
           updated_source = source[0, existing_yard_docs.begin(0)]
           updated_source << "#{indent}#{BEGIN_YARD_COMMENT}\n"
           updated_source << "#{indent}#{UPDATE_COMMAND_COMMENT}\n"
+          updated_source << "#{indent}# rubocop:disable all\n"
           updated_source << "#{indent}class #{klass.name}\n" if has_class_def
           updated_source << yard_docs
           updated_source << "\n#{indent}end" if has_class_def
+          updated_source << "\n#{indent}# rubocop:enable all"
           updated_source << "\n#{indent}#{END_YARD_COMMENT}"
           updated_source << source[existing_yard_docs.end(0)..-1]
           updated_source
@@ -65,9 +67,11 @@ module SupportTableData
           yard_comments = <<~SOURCE.chomp("\n")
             #{BEGIN_YARD_COMMENT}
             #{UPDATE_COMMAND_COMMENT}
+            # rubocop:disable all
             class #{klass.name}
             #{yard_docs.lines.map { |line| line.blank? ? "\n" : "  #{line}" }.join}
             end
+            # rubocop:enable all
             #{END_YARD_COMMENT}
           SOURCE
           "#{source.rstrip}\n\n#{yard_comments}#{trailing_newline}"
