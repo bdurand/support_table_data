@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.6.0
+
+### Added
+
+- Added `delete_missing` option to `sync_table_data!` and `sync_all!`. When set to `true`, any records in the database that are not defined in the data files will be deleted. This option defaults to `false` to preserve backward compatibility.
+
 ## 1.5.2
 
 ### Added

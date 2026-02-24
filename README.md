@@ -240,6 +240,21 @@ Status.sync_table_data!
 
 This will add any missing records to the table and update existing records so that the attributes in the table match the values in the data files. Records that do not appear in the data files will not be touched. Any attributes not specified in the data files will not be changed.
 
+If you want to remove records from the database that are no longer in the data files, you can pass `delete_missing: true`:
+
+```ruby
+Status.sync_table_data!(delete_missing: true)
+```
+
+This option can also be passed to `SupportTableData.sync_all!`:
+
+```ruby
+SupportTableData.sync_all!(delete_missing: true)
+```
+
+> [!CAUTION]
+> Use `delete_missing` with care. It will delete any records in the table that are not defined in the data files, which may include user-created data or fail due to foreign key constraints.
+
 The number of records contained in data files should be fairly small (ideally fewer than 100). It is possible to load just a subset of rows in a large table because only the rows listed in the data files will be synced. You can use this feature if your table allows user-entered data, but has a few rows that must exist for the code to work.
 
 Loading data is done inside a database transaction. No changes will be persisted to the database unless all rows for a model can be synced.
@@ -308,6 +323,20 @@ end
 ### Testing
 
 You must also call `SupportTableData.sync_all!` before running your test suite. This method should be called in the test suite setup code after any data in the test database has been purged and before any tests are run.
+
+> [!TIP]
+> If you are using a truncation database cleaning strategy exclude the support tables from the tables that get truncated. Syncing data is much faster when the data is already in the database. You should use the `delete_missing` option to remove any records that are not in the data files instead of deleting all records before each test.
+
+```ruby
+# Excluding support tables from truncation in DatabaseCleaner configuration.
+RSpec.configure do |config|
+  config.before(:suite) do
+    support_tables = SupportTableData.support_table_classes.map(&:table_name)
+    DatabaseCleaner.clean_with(:truncation, except: support_tables)
+    SupportTableData.sync_all!(delete_missing: true)
+  end
+end
+```
 
 ## Installation
 
