@@ -12,17 +12,25 @@ module SupportTableData
         @klass = klass
       end
 
-      # Generate YARD documentation for the model's helper methods. When the
-      # number of named instances exceeds SupportTableData.compact_yard_threshold
-      # the output uses YARD @!macro directives to keep the file size manageable;
-      # otherwise it emits a verbose comment block per method.
+      # Generate YARD documentation for the model's helper methods. The format
+      # is controlled by the model's `support_table_yard_docs` setting:
       #
-      # @return [String, nil] The YARD documentation, or nil if no named instances
+      # * `:full`    - verbose comment block per method (default)
+      # * `:compact` - shared @!macro definitions plus a short @!method/@!macro
+      #                pair per generated method
+      # * `:none`    - generate no docs at all
+      #
+      # @return [String, nil] The YARD documentation, or nil if no docs should
+      #   be emitted (either because the model has no named instances or because
+      #   `support_table_yard_docs` is `:none`).
       def named_instance_yard_docs
+        return nil if klass.support_table_yard_docs == :none
+
         instance_names = klass.instance_names
         return nil if instance_names.empty?
 
-        if instance_names.size > SupportTableData.compact_yard_threshold
+        case klass.support_table_yard_docs
+        when :compact
           generate_compact_yard_docs(instance_names)
         else
           generate_verbose_yard_docs(instance_names)

@@ -13,8 +13,9 @@ module SupportTableData
   autoload :Documentation, File.expand_path("support_table_data/documentation", __dir__)
   autoload :Tasks, File.expand_path("support_table_data/tasks", __dir__)
 
+  YARD_DOC_OPTIONS = [:full, :compact, :none].freeze
+
   @data_directory = nil
-  @compact_yard_threshold = 20
   @rbs_signatures_path = nil
   @infer_documentation_types = true
 
@@ -39,6 +40,15 @@ module SupportTableData
     # value set by SupportTableData.data_directory. This is only used if relative paths are passed
     # in to add_support_table_data.
     class_attribute :support_table_data_directory, instance_accessor: false
+
+    # Private class attribute backing `support_table_yard_docs`. Use the public
+    # accessor to read/write.
+    # @private
+    class_attribute :_support_table_yard_docs, instance_accessor: false, default: :full
+    class << self
+      private :_support_table_yard_docs=
+      private :_support_table_yard_docs
+    end
   end
 
   class_methods do
@@ -54,6 +64,31 @@ module SupportTableData
     # @return [String] The name of the key attribute.
     def support_table_key_attribute
       _support_table_key_attribute || "id"
+    end
+
+    # Get the YARD documentation mode for this model. One of:
+    #
+    # * `:full`    - emit a verbose comment block per generated method (default)
+    # * `:compact` - emit shared @!macro definitions plus a short
+    #                @!method/@!macro pair per generated method
+    # * `:none`    - generate no YARD docs for this model; the rake task will
+    #                strip any existing generated YARD docs
+    #
+    # @return [Symbol]
+    def support_table_yard_docs
+      _support_table_yard_docs
+    end
+
+    # Set the YARD documentation mode for this model. See `support_table_yard_docs`
+    # for the supported values.
+    #
+    # @param value [Symbol]
+    # @return [void]
+    def support_table_yard_docs=(value)
+      unless SupportTableData::YARD_DOC_OPTIONS.include?(value)
+        raise ArgumentError, "support_table_yard_docs must be one of #{SupportTableData::YARD_DOC_OPTIONS.inspect} (got #{value.inspect})"
+      end
+      self._support_table_yard_docs = value
     end
 
     # Synchronize the rows in the table with the values defined in the data files added with
@@ -380,13 +415,6 @@ module SupportTableData
     def data_directory=(value)
       @data_directory = value&.to_s
     end
-
-    # When a model has more than this many named instances, the YARD docs
-    # generator emits a compact form using @!macro directives instead of a
-    # verbose comment block per method. Defaults to 5.
-    #
-    # @return [Integer]
-    attr_accessor :compact_yard_threshold
 
     # Override the directory under which generated RBS signature files are
     # written. When nil (the default) signatures go to

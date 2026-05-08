@@ -111,59 +111,93 @@ RSpec.describe SupportTableData::Documentation::YardDoc do
       expect(green_pos).to be < red_pos
     end
 
-    context "when there are more named instances than the compact threshold" do
+    context "when the model declares support_table_yard_docs = :compact" do
       around do |example|
-        original = SupportTableData.compact_yard_threshold
-        SupportTableData.compact_yard_threshold = 5
+        original = Color.support_table_yard_docs
+        Color.support_table_yard_docs = :compact
         begin
           example.run
         ensure
-          SupportTableData.compact_yard_threshold = original
+          Color.support_table_yard_docs = original
         end
       end
 
-      it "emits the compact macro form for Hue (9 instances)" do
-        doc = SupportTableData::Documentation::YardDoc.new(Hue)
+      it "emits the compact macro form" do
+        doc = SupportTableData::Documentation::YardDoc.new(Color)
         result = doc.named_instance_yard_docs
 
         expect(result).not_to be_nil
         expect(result).to include("# @!group Named Instances")
         expect(result).to include("# @!endgroup")
 
-        # Macro definitions are emitted once.
         expect(result).to include("# @!macro [new] support_table_data_finder")
         expect(result).to include("# @!macro [new] support_table_data_predicate")
-        # Hue has no attribute helpers, but the attribute macro is still defined.
         expect(result).to include("# @!macro [new] support_table_data_attribute")
         expect(result.scan("# @!macro [new] support_table_data_finder").size).to eq(1)
 
-        # Per-instance entries reference the macros rather than repeating prose.
         expect(result).to include("# @!method self.red")
         expect(result).to include("# @!macro support_table_data_finder red")
         expect(result).to include("# @!method red?")
         expect(result).to include("# @!macro support_table_data_predicate red")
         expect(result).not_to include("# Find the named instance +red+ from the database.")
       end
+    end
 
-      it "uses the verbose form when count is at or below the threshold" do
-        SupportTableData.compact_yard_threshold = 4
-        doc = SupportTableData::Documentation::YardDoc.new(Color)
-        result = doc.named_instance_yard_docs
-
-        # Color has 4 instances; with threshold 4 we are NOT above it -> verbose.
-        expect(result).to include("# Find the named instance +red+ from the database.")
-        expect(result).not_to include("# @!macro [new]")
+    context "when the model declares support_table_yard_docs = :compact with attribute helpers" do
+      around do |example|
+        original = Group.support_table_yard_docs
+        Group.support_table_yard_docs = :compact
+        begin
+          example.run
+        ensure
+          Group.support_table_yard_docs = original
+        end
       end
 
-      it "includes attribute macro invocations with column-derived types" do
+      it "emits attribute macro invocations with column-derived types" do
         doc = SupportTableData::Documentation::YardDoc.new(Group)
-        # Group only has 3 instances normally; force compact form to test attribute output.
-        SupportTableData.compact_yard_threshold = 0
         result = doc.named_instance_yard_docs
 
         # Group has attribute helpers for group_id (integer) and name (string).
         expect(result).to include("# @!macro support_table_data_attribute primary group_id Integer")
         expect(result).to include("# @!macro support_table_data_attribute primary name String")
+      end
+    end
+
+    context "when the model declares support_table_yard_docs = :none" do
+      around do |example|
+        original = Color.support_table_yard_docs
+        Color.support_table_yard_docs = :none
+        begin
+          example.run
+        ensure
+          Color.support_table_yard_docs = original
+        end
+      end
+
+      it "returns nil even when the model has named instances" do
+        doc = SupportTableData::Documentation::YardDoc.new(Color)
+        expect(doc.named_instance_yard_docs).to be_nil
+      end
+    end
+  end
+
+  describe "Color.support_table_yard_docs=" do
+    it "rejects unknown values" do
+      expect {
+        Color.support_table_yard_docs = :verbose
+      }.to raise_error(ArgumentError, /support_table_yard_docs must be one of/)
+    end
+
+    it "accepts :full, :compact, and :none" do
+      original = Color.support_table_yard_docs
+      begin
+        %i[full compact none].each do |value|
+          expect { Color.support_table_yard_docs = value }.not_to raise_error
+          expect(Color.support_table_yard_docs).to eq(value)
+        end
+      ensure
+        Color.support_table_yard_docs = original
       end
     end
   end
