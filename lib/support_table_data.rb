@@ -49,8 +49,8 @@ module SupportTableData
     end
 
     # Synchronize the rows in the table with the values defined in the data files added with
-    # `add_support_table_data`. Note that rows will not be deleted if they are no longer in
-    # the data files.
+    # `add_support_table_data`. By default, rows that are no longer present in the data files
+    # will not be deleted unless `delete_missing` is enabled.
     #
     # @param delete_missing [Boolean] If true, then any records in the database that are not in the data
     #   files will be deleted. Use with caution.
@@ -80,7 +80,7 @@ module SupportTableData
                 record.save!
               end
 
-              synced_ids << record.id
+              synced_ids << record.id if attributes
             end
 
             canonical_data.each_value do |attributes|
