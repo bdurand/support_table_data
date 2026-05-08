@@ -2,6 +2,7 @@
 
 require "spec_helper"
 require "tmpdir"
+require "fileutils"
 
 RSpec.describe SupportTableData::Documentation::RbsFile do
   let(:color_path) { Pathname.new(File.expand_path("../../models/color.rb", __dir__)) }
