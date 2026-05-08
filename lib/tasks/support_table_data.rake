@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 namespace :support_table_data do
-  desc "Syncronize data for all models that include SupportTableData."
+  desc "Synchronize data for all models that include SupportTableData."
   task sync: :environment do
     SupportTableData::Tasks::Utils.eager_load!
 
