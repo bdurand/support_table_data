@@ -63,6 +63,31 @@ describe SupportTableData do
       ])
       expect { Color.sync_table_data! }.to raise_error(SupportTableData::ValidationError, /Validation failed for Color with id: 20 - Name can't be blank/)
     end
+
+    it "does not delete extra rows by default" do
+      Group.sync_table_data!
+      extra = Group.new(name: "extra")
+      extra.group_id = 99
+      extra.save!
+      Group.sync_table_data!
+      expect(Group.find_by(group_id: 99)).to eq extra
+    end
+
+    it "deletes extra rows not in the data files when delete_missing is true" do
+      Group.sync_table_data!
+      extra = Group.new(name: "extra")
+      extra.group_id = 99
+      extra.save!
+      expect(Group.find_by(group_id: 99)).to eq extra
+      Group.sync_table_data!(delete_missing: true)
+      expect(Group.find_by(group_id: 99)).to be_nil
+    end
+
+    it "does not delete rows that are in the data files when delete_missing is true" do
+      Group.sync_table_data!(delete_missing: true)
+      expect(Group.count).to eq 3
+      expect(Group.pluck(:name)).to match_array ["primary", "secondary", "gray"]
+    end
   end
 
   describe "sync_all!" do
@@ -102,6 +127,16 @@ describe SupportTableData do
       color.save!
       SupportTableData.sync_all!
       expect(Color.find_by(id: 10)).to eq color
+    end
+
+    it "deletes extra rows not in the data files when delete_missing is true" do
+      SupportTableData.sync_all!
+      extra = Group.new(name: "extra")
+      extra.group_id = 99
+      extra.save!
+      expect(Group.find_by(group_id: 99)).to eq extra
+      SupportTableData.sync_all!(delete_missing: true)
+      expect(Group.find_by(group_id: 99)).to be_nil
     end
 
     it "combines data when a record is defined across multiple data files" do
