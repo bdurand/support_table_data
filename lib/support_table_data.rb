@@ -9,7 +9,6 @@ module SupportTableData
   extend ActiveSupport::Concern
 
   autoload :ValidationError, File.expand_path("support_table_data/validation_error", __dir__)
-  autoload :DocumentationConnectionError, File.expand_path("support_table_data/documentation_connection_error", __dir__)
   autoload :Documentation, File.expand_path("support_table_data/documentation", __dir__)
   autoload :Tasks, File.expand_path("support_table_data/tasks", __dir__)
 
@@ -17,7 +16,6 @@ module SupportTableData
 
   @data_directory = nil
   @rbs_signatures_path = nil
-  @infer_documentation_types = true
 
   included do
     # Internal variables used for memoization.
@@ -434,17 +432,6 @@ module SupportTableData
     #
     # @return [String, Pathname, nil]
     attr_accessor :rbs_signatures_path
-
-    # When true (the default) the documentation generators read ActiveRecord
-    # column types so that attribute helper return types are real types like
-    # `String` or `Integer`. This requires a working database connection at
-    # generation time and will raise SupportTableData::DocumentationConnectionError
-    # if one is not available. Set to false to skip the database lookup and emit
-    # generic Object/untyped return types instead — useful for CI jobs that
-    # cannot or do not want to provision a database.
-    #
-    # @return [Boolean]
-    attr_accessor :infer_documentation_types
 
     # Sync all support table classes. Classes must already be loaded in order to be synced.
     #

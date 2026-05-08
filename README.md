@@ -216,13 +216,7 @@ class Feature < ApplicationRecord
 end
 ```
 
-The generator reads the underlying ActiveRecord column types so attribute helpers get specific return types (`String`, `Integer`, `Boolean`, etc.) in their documentation. This requires a working database connection at generation time. If the documentation tasks need to run in an environment without a database (for example a lint-only CI job), disable the lookup and the docs will fall back to generic `Object` / `untyped` return types:
-
-```ruby
-SupportTableData.infer_documentation_types = false
-```
-
-When the setting is left at its default (`true`) and no connection is available, the tasks raise `SupportTableData::DocumentationConnectionError` with instructions for both resolution paths so behavior is consistent across local and CI runs.
+Attribute helper return types (`String`, `Integer`, `Boolean`, etc.) are inferred per method by inspecting the value the helper actually returns. The values come straight from the parsed data file, so the documentation tasks do not need a database connection to run.
 
 #### Generating RBS Signatures
 

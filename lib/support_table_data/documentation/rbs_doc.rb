@@ -42,7 +42,7 @@ module SupportTableData
         lines << "def self.#{name}: () -> #{klass.name}"
         lines << "def #{name}?: () -> bool"
         klass.support_table_attribute_helpers.each do |attribute_name|
-          return_type = TypeInference.rbs_type(TypeInference.column_type(klass, attribute_name))
+          return_type = TypeInference.rbs_type(TypeInference.value_type(klass, "#{name}_#{attribute_name}"))
           lines << "def self.#{name}_#{attribute_name}: () -> #{return_type}"
         end
         lines

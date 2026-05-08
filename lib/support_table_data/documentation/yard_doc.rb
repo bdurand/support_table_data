@@ -72,7 +72,7 @@ module SupportTableData
       # @param attribute_name [String] The attribute being read.
       # @return [String] The YARD comment text
       def attribute_helper_yard_doc(name, attribute_name)
-        return_type = TypeInference.yard_type(TypeInference.column_type(klass, attribute_name))
+        return_type = attribute_yard_return_type(name, attribute_name)
         <<~YARD.chomp("\n")
           # Get the #{attribute_name} attribute from the data file
           # for the named instance +#{name}+.
@@ -167,11 +167,15 @@ module SupportTableData
         lines << "# @!method #{name}?"
         lines << "# @!macro #{MACRO_PREDICATE} #{name}"
         klass.support_table_attribute_helpers.each do |attribute_name|
-          return_type = TypeInference.yard_type(TypeInference.column_type(klass, attribute_name))
+          return_type = attribute_yard_return_type(name, attribute_name)
           lines << "# @!method self.#{name}_#{attribute_name}"
           lines << "# @!macro #{MACRO_ATTRIBUTE} #{name} #{attribute_name} #{return_type}"
         end
         lines.join("\n")
+      end
+
+      def attribute_yard_return_type(name, attribute_name)
+        TypeInference.yard_type(TypeInference.value_type(klass, "#{name}_#{attribute_name}"))
       end
     end
   end
