@@ -189,7 +189,7 @@ completed:
 
 In a Rails application, you can add YARD documentation for the named instance helpers by running the rake task `support_table_data:yard_docs`. This will add YARD comments to your model classes for each of the named instance helper methods defined on the model. Adding this documentation will help IDEs provide better code completion and inline documentation for the helper methods and expose the methods to AI agents.
 
-To update a single model file, pass an optional file path argument, for example: `bundle exec rake "support_table_data:yard_docs[app/models/status.rb]"`.
+To update a single model file, use the `add` task and pass an optional file path argument, for example: `bundle exec rake "support_table_data:yard_docs:add[app/models/status.rb]"`.
 
 The default behavior is to add the documentation comments at the end of the model class by reopening the class definition. If you prefer to have the documentation comments appear elsewhere in the file, you can add the following markers to your model class and the YARD documentation will be inserted between these markers.
 
@@ -228,7 +228,7 @@ When the setting is left at its default (`true`) and no connection is available,
 
 In addition to the inline YARD comments, you can generate [RBS](https://github.com/ruby/rbs) type signatures for the named instance helpers by running `bundle exec rake support_table_data:rbs`. This writes one `sig/<model_path>.rbs` file per model — for example a Rails model at `app/models/feature.rb` produces `sig/app/models/feature.rbs`. The signatures are picked up by Ruby LSP, Steep, RubyMine, and any other RBS-aware tool, and they keep the model source files free of generated content.
 
-Just like the YARD task, you can target a single file with `bundle exec rake "support_table_data:rbs[app/models/feature.rb]"`, verify they are up to date in CI with `support_table_data:rbs:verify`, and remove the generated files with `support_table_data:rbs:remove`. RBS generation is opt-in — running the YARD task alone does not produce RBS output, and vice versa.
+Just like the YARD task, you can target a single file with `bundle exec rake "support_table_data:rbs:add[app/models/feature.rb]"`, verify they are up to date in CI with `support_table_data:rbs:verify`, and remove the generated files with `support_table_data:rbs:remove`. RBS generation is opt-in — running the YARD task alone does not produce RBS output, and vice versa.
 
 ### Caching
 
