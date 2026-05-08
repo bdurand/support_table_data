@@ -21,6 +21,7 @@ namespace :support_table_data do
     end
   end
 
+  desc "Adds YARD documentation comments to all support table models to document the named instance methods."
   task yard_docs: "yard_docs:add"
 
   namespace :yard_docs do
@@ -70,6 +71,7 @@ namespace :support_table_data do
     end
   end
 
+  desc "Generates RBS signature files for named instance methods in all support table models."
   task rbs: "rbs:add"
 
   namespace :rbs do
