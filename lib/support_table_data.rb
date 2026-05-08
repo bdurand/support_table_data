@@ -49,11 +49,13 @@ module SupportTableData
     end
 
     # Synchronize the rows in the table with the values defined in the data files added with
-    # `add_support_table_data`. Note that rows will not be deleted if they are no longer in
-    # the data files.
+    # `add_support_table_data`. By default, rows that are no longer present in the data files
+    # will not be deleted unless `delete_missing` is enabled.
     #
+    # @param delete_missing [Boolean] If true, then any records in the database that are not in the data
+    #   files will be deleted. Use with caution.
     # @return [Array<Hash>] List of saved changes for each record that was created or modified.
-    def sync_table_data!
+    def sync_table_data!(delete_missing: false)
       return unless table_exists?
 
       canonical_data = support_table_data.each_with_object({}) do |attributes, hash|
@@ -64,6 +66,8 @@ module SupportTableData
 
       begin
         ActiveSupport::Notifications.instrument("support_table_data.sync", class: self) do
+          synced_ids = []
+
           transaction do
             records.each do |record|
               key = record[support_table_key_attribute].to_s
@@ -75,6 +79,8 @@ module SupportTableData
                 changes << record.changes
                 record.save!
               end
+
+              synced_ids << record.id if attributes
             end
 
             canonical_data.each_value do |attributes|
@@ -86,6 +92,11 @@ module SupportTableData
               end
               changes << record.changes
               record.save!
+              synced_ids << record.id
+            end
+
+            if delete_missing
+              where.not(primary_key => synced_ids).destroy_all
             end
           end
         end
@@ -382,11 +393,13 @@ module SupportTableData
     # when the test suite is initializing.
     #
     # @param extra_classes [Class] List of classes to force into the detected list of classes to sync.
+    # @param delete_missing [Boolean] If true, then any records in the database that are not in the data
+    #   files will be deleted from each table. Use with caution.
     # @return [Hash<Class, Array<Hash>] Hash of classes synced with a list of saved changes.
-    def sync_all!(*extra_classes)
+    def sync_all!(*extra_classes, delete_missing: false)
       changes = {}
       support_table_classes(*extra_classes).each do |klass|
-        changes[klass] = klass.sync_table_data!
+        changes[klass] = klass.sync_table_data!(delete_missing: delete_missing)
       end
       changes
     end
