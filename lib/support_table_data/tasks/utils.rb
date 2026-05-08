@@ -23,7 +23,8 @@ module SupportTableData
         # @param file_path [String, Pathname, nil] Optional file path to filter by.
         # @return [Array<SupportTableData::Documentation::SourceFile>]
         def support_table_sources(file_path = nil)
-          require_relative file_path if file_path
+          file_path = Pathname.new(file_path) if file_path.is_a?(String)
+          require file_path.expand_path if file_path
 
           sources = []
 
