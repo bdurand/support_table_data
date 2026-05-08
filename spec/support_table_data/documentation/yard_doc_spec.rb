@@ -33,6 +33,22 @@ RSpec.describe SupportTableData::Documentation::YardDoc do
     end
   end
 
+  describe "#attribute_helper_yard_doc" do
+    it "uses the column type for the @return tag when the column is known" do
+      doc = SupportTableData::Documentation::YardDoc.new(Group)
+      result = doc.attribute_helper_yard_doc("primary", "name")
+
+      expect(result).to include("# @return [String]")
+    end
+
+    it "falls back to Object when the column is not on the table" do
+      doc = SupportTableData::Documentation::YardDoc.new(Group)
+      result = doc.attribute_helper_yard_doc("primary", "not_a_real_column")
+
+      expect(result).to include("# @return [Object]")
+    end
+  end
+
   describe "#named_instance_yard_docs" do
     it "returns nil when model has no named instances" do
       allow(Color).to receive(:instance_names).and_return([])
@@ -93,6 +109,62 @@ RSpec.describe SupportTableData::Documentation::YardDoc do
       expect(black_pos).to be < blue_pos
       expect(blue_pos).to be < green_pos
       expect(green_pos).to be < red_pos
+    end
+
+    context "when there are more named instances than the compact threshold" do
+      around do |example|
+        original = SupportTableData.compact_yard_threshold
+        SupportTableData.compact_yard_threshold = 5
+        begin
+          example.run
+        ensure
+          SupportTableData.compact_yard_threshold = original
+        end
+      end
+
+      it "emits the compact macro form for Hue (9 instances)" do
+        doc = SupportTableData::Documentation::YardDoc.new(Hue)
+        result = doc.named_instance_yard_docs
+
+        expect(result).not_to be_nil
+        expect(result).to include("# @!group Named Instances")
+        expect(result).to include("# @!endgroup")
+
+        # Macro definitions are emitted once.
+        expect(result).to include("# @!macro [new] support_table_data_finder")
+        expect(result).to include("# @!macro [new] support_table_data_predicate")
+        # Hue has no attribute helpers, but the attribute macro is still defined.
+        expect(result).to include("# @!macro [new] support_table_data_attribute")
+        expect(result.scan("# @!macro [new] support_table_data_finder").size).to eq(1)
+
+        # Per-instance entries reference the macros rather than repeating prose.
+        expect(result).to include("# @!method self.red")
+        expect(result).to include("# @!macro support_table_data_finder red")
+        expect(result).to include("# @!method red?")
+        expect(result).to include("# @!macro support_table_data_predicate red")
+        expect(result).not_to include("# Find the named instance +red+ from the database.")
+      end
+
+      it "uses the verbose form when count is at or below the threshold" do
+        SupportTableData.compact_yard_threshold = 4
+        doc = SupportTableData::Documentation::YardDoc.new(Color)
+        result = doc.named_instance_yard_docs
+
+        # Color has 4 instances; with threshold 4 we are NOT above it -> verbose.
+        expect(result).to include("# Find the named instance +red+ from the database.")
+        expect(result).not_to include("# @!macro [new]")
+      end
+
+      it "includes attribute macro invocations with column-derived types" do
+        doc = SupportTableData::Documentation::YardDoc.new(Group)
+        # Group only has 3 instances normally; force compact form to test attribute output.
+        SupportTableData.compact_yard_threshold = 0
+        result = doc.named_instance_yard_docs
+
+        # Group has attribute helpers for group_id (integer) and name (string).
+        expect(result).to include("# @!macro support_table_data_attribute primary group_id Integer")
+        expect(result).to include("# @!macro support_table_data_attribute primary name String")
+      end
     end
   end
 end

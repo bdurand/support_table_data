@@ -32,7 +32,7 @@ class Status
   # for the named instance +active+.
   #
   # @!method self.active_name
-  # @return [Object]
+  # @return [String]
   # @!visibility public
 
   # Find the named instance +canceled+ from the database.
@@ -52,7 +52,7 @@ class Status
   # for the named instance +canceled+.
   #
   # @!method self.canceled_name
-  # @return [Object]
+  # @return [String]
   # @!visibility public
 
   # Find the named instance +completed+ from the database.
@@ -72,7 +72,7 @@ class Status
   # for the named instance +completed+.
   #
   # @!method self.completed_name
-  # @return [Object]
+  # @return [String]
   # @!visibility public
 
   # Find the named instance +failed+ from the database.
@@ -92,7 +92,7 @@ class Status
   # for the named instance +failed+.
   #
   # @!method self.failed_name
-  # @return [Object]
+  # @return [String]
   # @!visibility public
 
   # Find the named instance +pending+ from the database.
@@ -112,7 +112,7 @@ class Status
   # for the named instance +pending+.
   #
   # @!method self.pending_name
-  # @return [Object]
+  # @return [String]
   # @!visibility public
 
   # @!endgroup

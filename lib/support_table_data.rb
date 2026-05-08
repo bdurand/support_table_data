@@ -8,7 +8,15 @@
 module SupportTableData
   extend ActiveSupport::Concern
 
+  autoload :ValidationError, File.expand_path("support_table_data/validation_error", __dir__)
+  autoload :DocumentationConnectionError, File.expand_path("support_table_data/documentation_connection_error", __dir__)
+  autoload :Documentation, File.expand_path("support_table_data/documentation", __dir__)
+  autoload :Tasks, File.expand_path("support_table_data/tasks", __dir__)
+
   @data_directory = nil
+  @compact_yard_threshold = 20
+  @rbs_signatures_path = nil
+  @infer_documentation_types = true
 
   included do
     # Internal variables used for memoization.
@@ -373,6 +381,32 @@ module SupportTableData
       @data_directory = value&.to_s
     end
 
+    # When a model has more than this many named instances, the YARD docs
+    # generator emits a compact form using @!macro directives instead of a
+    # verbose comment block per method. Defaults to 5.
+    #
+    # @return [Integer]
+    attr_accessor :compact_yard_threshold
+
+    # Override the directory under which generated RBS signature files are
+    # written. When nil (the default) signatures go to
+    # `<project_root>/sig/<model_path>.rbs`, where the project root is the
+    # nearest ancestor directory containing a Gemfile or .git directory.
+    #
+    # @return [String, Pathname, nil]
+    attr_accessor :rbs_signatures_path
+
+    # When true (the default) the documentation generators read ActiveRecord
+    # column types so that attribute helper return types are real types like
+    # `String` or `Integer`. This requires a working database connection at
+    # generation time and will raise SupportTableData::DocumentationConnectionError
+    # if one is not available. Set to false to skip the database lookup and emit
+    # generic Object/untyped return types instead — useful for CI jobs that
+    # cannot or do not want to provision a database.
+    #
+    # @return [Boolean]
+    attr_accessor :infer_documentation_types
+
     # Sync all support table classes. Classes must already be loaded in order to be synced.
     #
     # You can pass in a list of classes that you want to ensure are synced. This feature
@@ -482,8 +516,6 @@ module SupportTableData
     self.class.protected_instance?(self)
   end
 end
-
-require_relative "support_table_data/validation_error"
 
 if defined?(Rails::Railtie)
   require_relative "support_table_data/railtie"

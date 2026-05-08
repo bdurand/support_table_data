@@ -200,6 +200,30 @@ The default behavior is to add the documentation comments at the end of the mode
 
 A good practice is to add a check to your CI pipeline to ensure the documentation is always up to date. You can run the rake task `support_table_data:yard_docs:verify` to do this. It will exit with an error if any models do not have up to date documentation.
 
+For models with many named instances, the verbose comment form can become very long. When a model has more than `SupportTableData.compact_yard_threshold` named instances (default 20), the generator switches to a compact form that uses YARD `@!macro` directives. The macros are defined at the top of the documentation block with the prose templates, and each named instance gets a short `@!method`/`@!macro` pair beneath. IDEs and `yard doc` resolve the macros into the same per-method documentation you would get from the verbose form.
+
+To force the verbose form for all models, set the threshold to a high value (e.g. in an initializer):
+
+```ruby
+SupportTableData.compact_yard_threshold = 1000
+```
+
+To force the compact form everywhere, set it to `0`.
+
+The generator reads the underlying ActiveRecord column types so attribute helpers get specific return types (`String`, `Integer`, `Boolean`, etc.) in their documentation. This requires a working database connection at generation time. If the documentation tasks need to run in an environment without a database (for example a lint-only CI job), disable the lookup and the docs will fall back to generic `Object` / `untyped` return types:
+
+```ruby
+SupportTableData.infer_documentation_types = false
+```
+
+When the setting is left at its default (`true`) and no connection is available, the tasks raise `SupportTableData::DocumentationConnectionError` with instructions for both resolution paths so behavior is consistent across local and CI runs.
+
+#### Generating RBS Signatures
+
+In addition to the inline YARD comments, you can generate [RBS](https://github.com/ruby/rbs) type signatures for the named instance helpers by running `bundle exec rake support_table_data:rbs`. This writes one `sig/<model_path>.rbs` file per model — for example a Rails model at `app/models/feature.rb` produces `sig/app/models/feature.rbs`. The signatures are picked up by Ruby LSP, Steep, RubyMine, and any other RBS-aware tool, and they keep the model source files free of generated content.
+
+Just like the YARD task, you can target a single file with `bundle exec rake "support_table_data:rbs[app/models/feature.rb]"`, verify they are up to date in CI with `support_table_data:rbs:verify`, and remove the generated files with `support_table_data:rbs:remove`. RBS generation is opt-in — running the YARD task alone does not produce RBS output, and vice versa.
+
 ### Caching
 
 You can use the companion [support_table_cache gem](https://github.com/bdurand/support_table_cache) to add caching support to your models. That way your application won't need to constantly query the database for records that will never change.

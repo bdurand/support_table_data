@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.6.0
+
+### Added
+
+- Generated YARD documentation now switches to a compact `@!macro`-based form when a model has more than `SupportTableData.compact_yard_threshold` named instances (default 20). The macro definitions appear once at the top of the documentation block with the prose templates so the file stays readable for humans, and IDEs/`yard doc` resolve them into the same per-method documentation as the verbose form. This dramatically reduces the size of the generated comment block on models with many instances.
+- The attribute helper YARD comment now uses the underlying ActiveRecord column type (`String`, `Integer`, `Boolean`, etc.) for `@return` instead of the generic `Object`. This requires a database connection at generation time; set `SupportTableData.infer_documentation_types = false` to opt out and fall back to generic types. When type inference is enabled but no connection is available, the tasks now raise a clear `SupportTableData::DocumentationConnectionError` rather than failing with a low-level ActiveRecord error.
+- Added opt-in RBS signature generation. The new tasks `support_table_data:rbs`, `support_table_data:rbs:verify`, and `support_table_data:rbs:remove` write/check/delete `sig/<model_path>.rbs` files so the named instance helpers are visible to Ruby LSP, Steep, RubyMine, and other RBS-aware tools without polluting the model source files. The output directory can be overridden with `SupportTableData.rbs_signatures_path`.
+
 ## 1.5.2
 
 ### Added
