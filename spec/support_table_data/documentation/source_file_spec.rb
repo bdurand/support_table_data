@@ -187,6 +187,73 @@ RSpec.describe SupportTableData::Documentation::SourceFile do
     end
   end
 
+  context "when the model declares support_table_yard_docs = :none" do
+    around do |example|
+      original = Color.support_table_yard_docs
+      Color.support_table_yard_docs = :none
+      begin
+        example.run
+      ensure
+        Color.support_table_yard_docs = original
+      end
+    end
+
+    it "strips existing YARD docs from the source" do
+      source_with_old_docs = <<~RUBY
+        class Color < ActiveRecord::Base
+          include SupportTableData
+
+          # Begin YARD docs for support_table_data
+          class Color
+            # Old YARD docs
+          end
+          # End YARD docs for support_table_data
+        end
+      RUBY
+
+      source_file = SupportTableData::Documentation::SourceFile.new(Color, color_path)
+      allow(source_file).to receive(:source).and_return(source_with_old_docs)
+
+      result = source_file.source_with_yard_docs
+
+      expect(result).not_to include("# Begin YARD docs for support_table_data")
+      expect(result).not_to include("# Old YARD docs")
+      expect(result).to include("class Color < ActiveRecord::Base")
+    end
+
+    it "leaves the source unchanged when no YARD docs are present" do
+      source_without_docs = <<~RUBY
+        class Color < ActiveRecord::Base
+          include SupportTableData
+        end
+      RUBY
+
+      source_file = SupportTableData::Documentation::SourceFile.new(Color, color_path)
+      allow(source_file).to receive(:source).and_return(source_without_docs)
+
+      expect(source_file.source_with_yard_docs).to eq(source_without_docs)
+    end
+
+    it "reports yard_docs_up_to_date? false when stale docs remain" do
+      source_with_old_docs = <<~RUBY
+        class Color < ActiveRecord::Base
+          include SupportTableData
+
+          # Begin YARD docs for support_table_data
+          class Color
+            # Old YARD docs
+          end
+          # End YARD docs for support_table_data
+        end
+      RUBY
+
+      source_file = SupportTableData::Documentation::SourceFile.new(Color, color_path)
+      allow(source_file).to receive(:source).and_return(source_with_old_docs)
+
+      expect(source_file.yard_docs_up_to_date?).to be false
+    end
+  end
+
   describe "#yard_docs_up_to_date?" do
     it "returns true when YARD docs match current generated docs" do
       source_file = SupportTableData::Documentation::SourceFile.new(Color, color_path)

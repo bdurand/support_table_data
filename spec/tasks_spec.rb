@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require_relative "spec_helper"
+require "spec_helper"
 require "rake"
 
 RSpec.describe "support_table_data rake tasks" do
@@ -35,9 +35,6 @@ RSpec.describe "support_table_data rake tasks" do
 
   describe "yard_docs:add" do
     it "adds YARD documentation to models with named instances" do
-      require_relative "../lib/support_table_data/documentation"
-      require_relative "../lib/tasks/utils"
-
       # Mock stdout to capture puts
       allow($stdout).to receive(:puts)
 
@@ -62,9 +59,6 @@ RSpec.describe "support_table_data rake tasks" do
     end
 
     it "applies only to the specified file path when provided" do
-      require_relative "../lib/support_table_data/documentation"
-      require_relative "../lib/tasks/utils"
-
       allow($stdout).to receive(:puts)
 
       written_files = []
@@ -81,9 +75,6 @@ RSpec.describe "support_table_data rake tasks" do
 
   describe "yard_docs:remove" do
     it "removes YARD documentation from models" do
-      require_relative "../lib/support_table_data/documentation"
-      require_relative "../lib/tasks/utils"
-
       # Mock stdout to capture puts
       allow($stdout).to receive(:puts)
 
@@ -111,9 +102,6 @@ RSpec.describe "support_table_data rake tasks" do
     end
 
     it "applies only to the specified file path when provided" do
-      require_relative "../lib/support_table_data/documentation"
-      require_relative "../lib/tasks/utils"
-
       allow($stdout).to receive(:puts)
 
       written_files = []
@@ -131,11 +119,81 @@ RSpec.describe "support_table_data rake tasks" do
     end
   end
 
+  describe "rbs:add" do
+    it "writes RBS files for models with named instances" do
+      allow($stdout).to receive(:puts)
+
+      written_files = []
+      allow_any_instance_of(SupportTableData::Documentation::RbsFile).to receive(:write!) do |instance|
+        written_files << {path: instance.path.to_s, klass: instance.klass.name}
+        true
+      end
+      allow_any_instance_of(SupportTableData::Documentation::RbsFile)
+        .to receive(:up_to_date?).and_return(false)
+
+      Rake.application.invoke_task "support_table_data:rbs:add"
+
+      expect(written_files).not_to be_empty
+      expect(written_files.map { |f| f[:klass] }).to include("Color")
+    end
+
+    it "applies only to the specified file path when provided" do
+      allow($stdout).to receive(:puts)
+
+      written_files = []
+      allow_any_instance_of(SupportTableData::Documentation::RbsFile).to receive(:write!) do |instance|
+        written_files << {path: instance.path.to_s, klass: instance.klass.name}
+        true
+      end
+      allow_any_instance_of(SupportTableData::Documentation::RbsFile)
+        .to receive(:up_to_date?).and_return(false)
+
+      Rake::Task["support_table_data:rbs:add"].invoke(color_model_path)
+
+      expect(written_files.map { |f| f[:klass] }).to eq(["Color"])
+    end
+  end
+
+  describe "rbs:remove" do
+    it "removes generated RBS files for support table models" do
+      allow($stdout).to receive(:puts)
+
+      removed = []
+      allow_any_instance_of(SupportTableData::Documentation::RbsFile).to receive(:remove!) do |instance|
+        removed << instance.klass.name
+        true
+      end
+
+      Rake.application.invoke_task "support_table_data:rbs:remove"
+
+      expect(removed).not_to be_empty
+    end
+  end
+
+  describe "rbs:verify" do
+    it "passes when all signatures are up to date" do
+      allow($stdout).to receive(:puts)
+      allow_any_instance_of(SupportTableData::Documentation::RbsFile)
+        .to receive(:up_to_date?).and_return(true)
+
+      Rake.application.invoke_task "support_table_data:rbs:verify"
+
+      expect($stdout).to have_received(:puts).with("All support table models have up to date RBS signatures.")
+    end
+
+    it "raises when signatures are out of date" do
+      allow($stdout).to receive(:puts)
+      allow_any_instance_of(SupportTableData::Documentation::RbsFile)
+        .to receive(:up_to_date?).and_return(false)
+
+      expect {
+        Rake.application.invoke_task "support_table_data:rbs:verify"
+      }.to raise_error(RuntimeError)
+    end
+  end
+
   describe "yard_docs:verify" do
     it "verifies YARD documentation is up to date" do
-      require_relative "../lib/support_table_data/documentation"
-      require_relative "../lib/tasks/utils"
-
       allow($stdout).to receive(:puts)
       allow_any_instance_of(SupportTableData::Documentation::SourceFile)
         .to receive(:yard_docs_up_to_date?).and_return(true)
@@ -148,9 +206,6 @@ RSpec.describe "support_table_data rake tasks" do
     end
 
     it "raises an error if any YARD documentation is out of date" do
-      require_relative "../lib/support_table_data/documentation"
-      require_relative "../lib/tasks/utils"
-
       allow($stdout).to receive(:puts)
       allow_any_instance_of(SupportTableData::Documentation::SourceFile)
         .to receive(:yard_docs_up_to_date?).and_return(false)
@@ -165,9 +220,6 @@ RSpec.describe "support_table_data rake tasks" do
     end
 
     it "verifies only the specified file path when provided" do
-      require_relative "../lib/support_table_data/documentation"
-      require_relative "../lib/tasks/utils"
-
       allow($stdout).to receive(:puts)
 
       expect_any_instance_of(SupportTableData::Documentation::SourceFile)

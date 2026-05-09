@@ -44,7 +44,9 @@ module SupportTableData
       # @return [String]
       def source_with_yard_docs
         yard_docs = YardDoc.new(klass).named_instance_yard_docs
-        return source if yard_docs.nil?
+        if yard_docs.nil?
+          return has_yard_docs? ? source_without_yard_docs : source
+        end
 
         existing_yard_docs = source.match(YARD_COMMENT_REGEX)
         if existing_yard_docs

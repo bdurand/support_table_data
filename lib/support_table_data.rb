@@ -8,7 +8,14 @@
 module SupportTableData
   extend ActiveSupport::Concern
 
+  autoload :ValidationError, File.expand_path("support_table_data/validation_error", __dir__)
+  autoload :Documentation, File.expand_path("support_table_data/documentation", __dir__)
+  autoload :Tasks, File.expand_path("support_table_data/tasks", __dir__)
+
+  YARD_DOC_OPTIONS = [:full, :compact, :none].freeze
+
   @data_directory = nil
+  @rbs_signatures_path = nil
 
   included do
     # Internal variables used for memoization.
@@ -31,6 +38,15 @@ module SupportTableData
     # value set by SupportTableData.data_directory. This is only used if relative paths are passed
     # in to add_support_table_data.
     class_attribute :support_table_data_directory, instance_accessor: false
+
+    # Private class attribute backing `support_table_yard_docs`. Use the public
+    # accessor to read/write.
+    # @private
+    class_attribute :_support_table_yard_docs, instance_accessor: false, default: :full
+    class << self
+      private :_support_table_yard_docs=
+      private :_support_table_yard_docs
+    end
   end
 
   class_methods do
@@ -46,6 +62,31 @@ module SupportTableData
     # @return [String] The name of the key attribute.
     def support_table_key_attribute
       _support_table_key_attribute || "id"
+    end
+
+    # Get the YARD documentation mode for this model. One of:
+    #
+    # * `:full`    - emit a verbose comment block per generated method (default)
+    # * `:compact` - emit shared @!macro definitions plus a short
+    #                @!method/@!macro pair per generated method
+    # * `:none`    - generate no YARD docs for this model; the rake task will
+    #                strip any existing generated YARD docs
+    #
+    # @return [Symbol]
+    def support_table_yard_docs
+      _support_table_yard_docs
+    end
+
+    # Set the YARD documentation mode for this model. See `support_table_yard_docs`
+    # for the supported values.
+    #
+    # @param value [Symbol]
+    # @return [void]
+    def support_table_yard_docs=(value)
+      unless SupportTableData::YARD_DOC_OPTIONS.include?(value)
+        raise ArgumentError, "support_table_yard_docs must be one of #{SupportTableData::YARD_DOC_OPTIONS.inspect} (got #{value.inspect})"
+      end
+      self._support_table_yard_docs = value
     end
 
     # Synchronize the rows in the table with the values defined in the data files added with
@@ -384,6 +425,14 @@ module SupportTableData
       @data_directory = value&.to_s
     end
 
+    # Override the directory under which generated RBS signature files are
+    # written. When nil (the default) signatures go to
+    # `<project_root>/sig/<model_path>.rbs`, where the project root is the
+    # nearest ancestor directory containing a Gemfile or .git directory.
+    #
+    # @return [String, Pathname, nil]
+    attr_accessor :rbs_signatures_path
+
     # Sync all support table classes. Classes must already be loaded in order to be synced.
     #
     # You can pass in a list of classes that you want to ensure are synced. This feature
@@ -495,8 +544,6 @@ module SupportTableData
     self.class.protected_instance?(self)
   end
 end
-
-require_relative "support_table_data/validation_error"
 
 if defined?(Rails::Railtie)
   require_relative "support_table_data/railtie"

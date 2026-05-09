@@ -33,6 +33,22 @@ RSpec.describe SupportTableData::Documentation::YardDoc do
     end
   end
 
+  describe "#attribute_helper_yard_doc" do
+    it "uses the column type for the @return tag when the column is known" do
+      doc = SupportTableData::Documentation::YardDoc.new(Group)
+      result = doc.attribute_helper_yard_doc("primary", "name")
+
+      expect(result).to include("# @return [String]")
+    end
+
+    it "falls back to Object when the column is not on the table" do
+      doc = SupportTableData::Documentation::YardDoc.new(Group)
+      result = doc.attribute_helper_yard_doc("primary", "not_a_real_column")
+
+      expect(result).to include("# @return [Object]")
+    end
+  end
+
   describe "#named_instance_yard_docs" do
     it "returns nil when model has no named instances" do
       allow(Color).to receive(:instance_names).and_return([])
@@ -93,6 +109,96 @@ RSpec.describe SupportTableData::Documentation::YardDoc do
       expect(black_pos).to be < blue_pos
       expect(blue_pos).to be < green_pos
       expect(green_pos).to be < red_pos
+    end
+
+    context "when the model declares support_table_yard_docs = :compact" do
+      around do |example|
+        original = Color.support_table_yard_docs
+        Color.support_table_yard_docs = :compact
+        begin
+          example.run
+        ensure
+          Color.support_table_yard_docs = original
+        end
+      end
+
+      it "emits the compact macro form" do
+        doc = SupportTableData::Documentation::YardDoc.new(Color)
+        result = doc.named_instance_yard_docs
+
+        expect(result).not_to be_nil
+        expect(result).to include("# @!group Named Instances")
+        expect(result).to include("# @!endgroup")
+
+        expect(result).to include("# @!macro [new] support_table_data_finder")
+        expect(result).to include("# @!macro [new] support_table_data_predicate")
+        expect(result).to include("# @!macro [new] support_table_data_attribute")
+        expect(result.scan("# @!macro [new] support_table_data_finder").size).to eq(1)
+
+        expect(result).to include("# @!method self.red")
+        expect(result).to include("# @!macro support_table_data_finder red")
+        expect(result).to include("# @!method red?")
+        expect(result).to include("# @!macro support_table_data_predicate red")
+        expect(result).not_to include("# Find the named instance +red+ from the database.")
+      end
+    end
+
+    context "when the model declares support_table_yard_docs = :compact with attribute helpers" do
+      around do |example|
+        original = Group.support_table_yard_docs
+        Group.support_table_yard_docs = :compact
+        begin
+          example.run
+        ensure
+          Group.support_table_yard_docs = original
+        end
+      end
+
+      it "emits attribute macro invocations with column-derived types" do
+        doc = SupportTableData::Documentation::YardDoc.new(Group)
+        result = doc.named_instance_yard_docs
+
+        # Group has attribute helpers for group_id (integer) and name (string).
+        expect(result).to include("# @!macro support_table_data_attribute primary group_id Integer")
+        expect(result).to include("# @!macro support_table_data_attribute primary name String")
+      end
+    end
+
+    context "when the model declares support_table_yard_docs = :none" do
+      around do |example|
+        original = Color.support_table_yard_docs
+        Color.support_table_yard_docs = :none
+        begin
+          example.run
+        ensure
+          Color.support_table_yard_docs = original
+        end
+      end
+
+      it "returns nil even when the model has named instances" do
+        doc = SupportTableData::Documentation::YardDoc.new(Color)
+        expect(doc.named_instance_yard_docs).to be_nil
+      end
+    end
+  end
+
+  describe "Color.support_table_yard_docs=" do
+    it "rejects unknown values" do
+      expect {
+        Color.support_table_yard_docs = :verbose
+      }.to raise_error(ArgumentError, /support_table_yard_docs must be one of/)
+    end
+
+    it "accepts :full, :compact, and :none" do
+      original = Color.support_table_yard_docs
+      begin
+        %i[full compact none].each do |value|
+          expect { Color.support_table_yard_docs = value }.not_to raise_error
+          expect(Color.support_table_yard_docs).to eq(value)
+        end
+      ensure
+        Color.support_table_yard_docs = original
+      end
     end
   end
 end

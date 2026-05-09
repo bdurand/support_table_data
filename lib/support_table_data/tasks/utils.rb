@@ -23,7 +23,8 @@ module SupportTableData
         # @param file_path [String, Pathname, nil] Optional file path to filter by.
         # @return [Array<SupportTableData::Documentation::SourceFile>]
         def support_table_sources(file_path = nil)
-          require_relative file_path if file_path
+          file_path = Pathname.new(file_path) if file_path.is_a?(String)
+          require file_path.expand_path if file_path
 
           sources = []
 
@@ -49,6 +50,16 @@ module SupportTableData
           sources.select { |source| source.path.expand_path == resolved_path }
         rescue ArgumentError
           []
+        end
+
+        # Return RBS file handlers for all support table models.
+        #
+        # @param file_path [String, Pathname, nil] Optional file path to filter by.
+        # @return [Array<SupportTableData::Documentation::RbsFile>]
+        def support_table_rbs_files(file_path = nil)
+          support_table_sources(file_path).map do |source|
+            Documentation::RbsFile.new(source.klass, source.path)
+          end
         end
 
         def model_file_path(klass)

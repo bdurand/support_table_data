@@ -1,10 +1,8 @@
 # frozen_string_literal: true
 
 namespace :support_table_data do
-  desc "Syncronize data for all models that include SupportTableData."
+  desc "Synchronize data for all models that include SupportTableData."
   task sync: :environment do
-    require_relative "utils"
-
     SupportTableData::Tasks::Utils.eager_load!
 
     logger_callback = lambda do |name, started, finished, unique_id, payload|
@@ -23,14 +21,12 @@ namespace :support_table_data do
     end
   end
 
+  desc "Adds YARD documentation comments to all support table models to document the named instance methods."
   task yard_docs: "yard_docs:add"
 
   namespace :yard_docs do
     desc "Adds YARD documentation comments to models to document the named instance methods. Optional arg: file_path"
     task :add, [:file_path] => :environment do |_task, args|
-      require_relative "../support_table_data/documentation"
-      require_relative "utils"
-
       SupportTableData::Tasks::Utils.eager_load!
       SupportTableData::Tasks::Utils.support_table_sources(args[:file_path]).each do |source_file|
         next if source_file.yard_docs_up_to_date?
@@ -42,9 +38,6 @@ namespace :support_table_data do
 
     desc "Removes YARD documentation comments added by support_table_data from models. Optional arg: file_path"
     task :remove, [:file_path] => :environment do |_task, args|
-      require_relative "../support_table_data/documentation"
-      require_relative "utils"
-
       SupportTableData::Tasks::Utils.eager_load!
       SupportTableData::Tasks::Utils.support_table_sources(args[:file_path]).each do |source_file|
         next unless source_file.has_yard_docs?
@@ -56,9 +49,6 @@ namespace :support_table_data do
 
     desc "Verify that support table models have up to date YARD docs for named instance methods. Optional arg: file_path"
     task :verify, [:file_path] => :environment do |_task, args|
-      require_relative "../support_table_data/documentation"
-      require_relative "utils"
-
       SupportTableData::Tasks::Utils.eager_load!
 
       all_up_to_date = true
@@ -77,6 +67,55 @@ namespace :support_table_data do
         end
       else
         raise "Run bundle exec rake support_table_data:yard_docs to update the documentation."
+      end
+    end
+  end
+
+  desc "Generates RBS signature files for named instance methods in all support table models."
+  task rbs: "rbs:add"
+
+  namespace :rbs do
+    desc "Generates RBS signature files for named instance methods. Optional arg: file_path"
+    task :add, [:file_path] => :environment do |_task, args|
+      SupportTableData::Tasks::Utils.eager_load!
+      SupportTableData::Tasks::Utils.support_table_rbs_files(args[:file_path]).each do |rbs_file|
+        next if rbs_file.up_to_date?
+
+        rbs_file.write!
+        puts "Wrote RBS signatures for #{rbs_file.klass.name} to #{rbs_file.path}."
+      end
+    end
+
+    desc "Removes generated RBS signature files. Optional arg: file_path"
+    task :remove, [:file_path] => :environment do |_task, args|
+      SupportTableData::Tasks::Utils.eager_load!
+      SupportTableData::Tasks::Utils.support_table_rbs_files(args[:file_path]).each do |rbs_file|
+        next unless rbs_file.remove!
+
+        puts "Removed RBS signatures for #{rbs_file.klass.name} (#{rbs_file.path})."
+      end
+    end
+
+    desc "Verify that generated RBS signature files are up to date. Optional arg: file_path"
+    task :verify, [:file_path] => :environment do |_task, args|
+      SupportTableData::Tasks::Utils.eager_load!
+
+      all_up_to_date = true
+      SupportTableData::Tasks::Utils.support_table_rbs_files(args[:file_path]).each do |rbs_file|
+        unless rbs_file.up_to_date?
+          puts "RBS signatures are not up to date for #{rbs_file.klass.name} (#{rbs_file.path})."
+          all_up_to_date = false
+        end
+      end
+
+      if all_up_to_date
+        if args[:file_path]
+          puts "RBS signatures are up to date for #{args[:file_path]}."
+        else
+          puts "All support table models have up to date RBS signatures."
+        end
+      else
+        raise "Run bundle exec rake support_table_data:rbs to update the signatures."
       end
     end
   end
