@@ -3,26 +3,28 @@
 module SupportTableData
   module Documentation
     # Infers documentation types for the dynamically-defined attribute helpers
-    # by calling the generated method and inspecting the class of the value
-    # it returns. The values returned by these helpers are frozen literals from
-    # the parsed data file, so this does not require a database connection.
-    #
-    # This module must not be used on finder helpers (e.g. `Color.red`), which
-    # call `find_by!` and would hit the database.
+    # by reading the canonical value out of the parsed data file and
+    # inspecting its class. This avoids invoking the generated method, which
+    # may have been wrapped (e.g. deprecated) to raise.
     module TypeInference
       module_function
 
-      # Determine the documentation type for an attribute helper by calling
-      # the method and looking at the class of the returned value. Returns
-      # nil when the method is not defined.
+      # Determine the documentation type for a named-instance attribute
+      # helper by looking up the attribute value in the model's named
+      # instance data and returning its class. Returns nil when the
+      # attribute is not defined for the named instance.
       #
       # @param klass [Class] The model class
-      # @param method_name [String, Symbol] The class method name to call
+      # @param name [String, Symbol] The named instance name
+      # @param attribute_name [String, Symbol] The attribute name
       # @return [Class, nil]
-      def value_type(klass, method_name)
-        return nil unless klass.respond_to?(method_name)
+      def value_type(klass, name, attribute_name)
+        return nil unless klass.respond_to?(:named_instance_data)
 
-        klass.public_send(method_name).class
+        data = klass.named_instance_data(name)
+        return nil unless data.is_a?(Hash) && data.key?(attribute_name.to_s)
+
+        data[attribute_name.to_s].class
       end
 
       # Map a Ruby value class to a YARD type string.
