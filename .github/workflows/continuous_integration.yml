@@ -41,7 +41,7 @@ jobs:
           - ruby: "2.5"
             appraisal: "activerecord_6.1"
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Set up Ruby ${{ matrix.ruby }}
       uses: ruby/setup-ruby@v1
       with:
