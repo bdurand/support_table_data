@@ -4,22 +4,26 @@ require "spec_helper"
 
 RSpec.describe SupportTableData::Documentation::TypeInference do
   describe ".value_type" do
-    it "returns the class of the value returned by the helper method" do
+    it "returns the class of the value from the named instance data" do
       # Group has named_instance_attribute_helpers :group_id, :name
-      expect(described_class.value_type(Group, "primary_name")).to eq(String)
-      expect(described_class.value_type(Group, "primary_group_id")).to eq(Integer)
+      expect(described_class.value_type(Group, "primary", "name")).to eq(String)
+      expect(described_class.value_type(Group, "primary", "group_id")).to eq(Integer)
     end
 
-    it "returns nil when the method is not defined" do
-      expect(described_class.value_type(Group, "not_a_real_method")).to be_nil
+    it "returns nil when the attribute is not present in the named instance data" do
+      expect(described_class.value_type(Group, "primary", "not_a_real_attribute")).to be_nil
     end
 
-    it "does not call the database for finder methods" do
-      # Sanity check: this confirms we are calling literal-returning helpers,
-      # not finder methods. Calling Group.primary would hit the DB; we should
-      # never invoke value_type on it.
+    it "returns nil when the named instance does not exist" do
+      expect(described_class.value_type(Group, "not_a_real_instance", "name")).to be_nil
+    end
+
+    it "does not invoke the generated helper methods" do
+      # The generated method may be wrapped (e.g. deprecated) to raise, so we
+      # must read the value from the data file rather than calling the method.
       expect(Group).not_to receive(:primary)
-      described_class.value_type(Group, "primary_name")
+      expect(Group).not_to receive(:primary_name)
+      described_class.value_type(Group, "primary", "name")
     end
   end
 

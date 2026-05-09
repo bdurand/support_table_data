@@ -175,7 +175,7 @@ module SupportTableData
       end
 
       def attribute_yard_return_type(name, attribute_name)
-        TypeInference.yard_type(TypeInference.value_type(klass, "#{name}_#{attribute_name}"))
+        TypeInference.yard_type(TypeInference.value_type(klass, name, attribute_name))
       end
     end
   end

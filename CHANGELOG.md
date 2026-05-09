@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.6.1
+
+### Fixed
+
+- Fixed issue with YARD and RBS documentation tasks possibly raising an error if a named value method is deprecated and wrapped to return an error. Types are now inferred directly from the data rather than calling a method.
+
 ## 1.6.0
 
 ### Added
