@@ -45,6 +45,30 @@ RSpec.describe SupportTableData::Documentation::SourceFile do
       expect(result).not_to include("End YARD docs")
     end
 
+    it "does not swallow user code between duplicated documentation blocks" do
+      source_with_duplicate_blocks = <<~RUBY
+        class Color < ActiveRecord::Base
+          # Begin YARD docs for support_table_data
+          # Some YARD docs
+          # End YARD docs for support_table_data
+
+          def user_method
+          end
+
+          # Begin YARD docs for support_table_data
+          # Some other YARD docs
+          # End YARD docs for support_table_data
+        end
+      RUBY
+
+      source_file = SupportTableData::Documentation::SourceFile.new(Color, color_path)
+      allow(source_file).to receive(:source).and_return(source_with_duplicate_blocks)
+
+      result = source_file.source_without_yard_docs
+
+      expect(result).to include("def user_method")
+    end
+
     it "preserves trailing newline if present in original" do
       source_with_newline = "class Color\nend\n"
       source_file = SupportTableData::Documentation::SourceFile.new(Color, color_path)

@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.6.2
+
+### Fixed
+
+- `sync_table_data!` with `delete_missing: true` now raises an `ArgumentError` instead of deleting every row in the table when the data files contain no rows (for example, when a data file was accidentally emptied or truncated).
+- Generated predicate methods (e.g. `record.active?`) now cast the data file value to the attribute type before comparing. Previously the raw file value was compared to the cast database attribute, so predicates silently returned `false` whenever the types differed (guaranteed for CSV data files, where all values are strings).
+- Single table inheritance subclasses no longer raise `NoMethodError` from `instance_names`, `instance_keys`, `protected_instance?`, and other class methods. Subclasses now share the support table state defined on their base class.
+- Named instance helper methods are now redefined when a later data file overrides an attribute or key value, so the helpers always return the merged values that are synced to the database. Previously they permanently returned the values from the first file that defined the named instance.
+- `named_instance_attribute_helpers` can now be called again with an attribute that was already registered without raising an `ArgumentError`.
+- YAML data files can now use anchors/aliases and date/time values. Previously these raised `Psych::AliasesNotEnabled` or `Psych::DisallowedClass` errors.
+- `protected_instance?` no longer returns stale results when data files are added after the protected keys were first computed.
+- Fixed broken cycle detection in the autosave association check during syncs that could cause infinite recursion on cyclic autosave associations.
+- `sync_table_data!` now retries once on `ActiveRecord::RecordNotUnique` errors caused by concurrent syncs inserting the same rows from another process.
+- `sync_table_data!` now returns an empty array instead of `nil` when the table does not exist.
+- `named_instance` now raises a clear `ActiveRecord::RecordNotFound` error for undefined named instances instead of querying the database for a `nil` key (which could silently return a row with a `NULL` key value).
+- Memoized class-level state is now consistently synchronized with the class mutex to avoid races on non-MRI Ruby implementations.
+- Setting `config.support_table.auto_sync = false` before the gem is loaded is no longer overwritten back to `true` by the Railtie.
+- The documentation tasks no longer corrupt model source files that contain duplicated generated YARD doc blocks (e.g. from a bad merge); the regex that finds the generated block is no longer greedy.
+- Data file names containing extra dots no longer break the class name detection used by `SupportTableData.sync_all!` to eager load models.
+- Error messages for invalid named instance definitions now include the model class name instead of repeating the instance name.
+
 ## 1.6.1
 
 ### Fixed

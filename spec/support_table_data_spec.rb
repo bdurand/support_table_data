@@ -88,6 +88,45 @@ describe SupportTableData do
       expect(Group.count).to eq 3
       expect(Group.pluck(:name)).to match_array ["primary", "secondary", "gray"]
     end
+
+    it "refuses to delete all rows when delete_missing is true and the data files contain no rows" do
+      Group.sync_table_data!
+      allow(Group).to receive(:support_table_data).and_return([])
+      expect { Group.sync_table_data!(delete_missing: true) }.to raise_error(ArgumentError, /Refusing to sync Group/)
+      expect(Group.count).to eq 3
+    end
+
+    it "does not raise on empty data files with delete_missing when the table is already empty" do
+      Invalid.delete_all
+      allow(Invalid).to receive(:support_table_data).and_return([])
+      expect(Invalid.sync_table_data!(delete_missing: true)).to eq []
+    end
+
+    it "returns an empty array if the table does not exist" do
+      allow(Group).to receive(:table_exists?).and_return(false)
+      expect(Group.sync_table_data!).to eq []
+    end
+
+    it "retries once if a concurrent sync inserted the same rows" do
+      calls = 0
+      allow(Group).to receive(:transaction).and_wrap_original do |original, *args, &block|
+        calls += 1
+        raise ActiveRecord::RecordNotUnique.new("duplicate key") if calls == 1
+        original.call(*args, &block)
+      end
+      expect(Group.sync_table_data!.size).to eq 3
+      expect(calls).to eq 2
+    end
+
+    it "reraises the error if the retried sync also hits a uniqueness violation" do
+      calls = 0
+      allow(Group).to receive(:transaction) do
+        calls += 1
+        raise ActiveRecord::RecordNotUnique.new("duplicate key")
+      end
+      expect { Group.sync_table_data! }.to raise_error(ActiveRecord::RecordNotUnique)
+      expect(calls).to eq 2
+    end
   end
 
   describe "sync_all!" do
@@ -202,6 +241,39 @@ describe SupportTableData do
     it "raises an error if the method is already defined" do
       expect { Invalid.add_support_table_data("invalid.yml") }.to raise_error(ArgumentError)
     end
+
+    it "casts the data file value when comparing in predicate methods" do
+      Size.sync_table_data!
+      small = Size.find_by!(name: "small")
+      expect(small.id).to eq 1
+      expect(small.small?).to eq true
+      expect(small.medium?).to eq false
+    end
+
+    it "supports YAML aliases and date values in data files" do
+      medium = Size.named_instance_data("medium")
+      expect(medium["active"]).to eq true
+      expect(medium["introduced_on"]).to eq Date.new(2020, 1, 15)
+      expect(medium["label"]).to eq "Medium"
+    end
+
+    it "redefines attribute helpers when a later data file overrides an attribute" do
+      expect(Size.small_label).to eq "Small"
+      expect(Size.large_label).to eq "Large"
+    end
+  end
+
+  describe "single table inheritance" do
+    it "shares support table state with subclasses" do
+      expect(Rectangle.instance_names).to eq Polygon.instance_names
+      expect(Rectangle.instance_keys).to eq Polygon.instance_keys
+    end
+
+    it "determines protected instances for subclass records" do
+      Polygon.sync_table_data!
+      expect(Polygon.rectangle.protected_instance?).to eq true
+      expect(Triangle.new(name: "Scalene").protected_instance?).to eq false
+    end
   end
 
   describe "instance_names" do
@@ -224,6 +296,12 @@ describe SupportTableData do
       expect(Group.primary_name).to eq "primary"
       expect(Group.secondary_name).to eq "secondary"
       expect(Group.gray_name).to eq "gray"
+    end
+
+    it "is idempotent when called again with an attribute that is already registered" do
+      expect { Group.named_instance_attribute_helpers(:name) }.to_not raise_error
+      expect(Group.primary_name).to eq "primary"
+      expect(Group.support_table_attribute_helpers).to match_array ["group_id", "name"]
     end
 
     it "can get a list of the defined attribute helpers" do
@@ -249,11 +327,27 @@ describe SupportTableData do
       expect(orange.protected_instance?).to eq true
       expect(brown.protected_instance?).to eq false
     end
+
+    it "picks up instances from data files added after the protected keys were memoized" do
+      klass = Class.new(ActiveRecord::Base) do
+        include SupportTableData
+
+        self.table_name = "colors"
+      end
+      klass.add_support_table_data("colors/named_colors.yml")
+
+      light_gray = klass.new
+      light_gray.id = 8
+      expect(light_gray.protected_instance?).to eq false
+
+      klass.add_support_table_data("colors/colors.json")
+      expect(light_gray.protected_instance?).to eq true
+    end
   end
 
   describe "support_table_classes" do
     it "gets a list of all loaded support table classes with dependencies listed first" do
-      expect(SupportTableData.support_table_classes).to eq [Shade, Group, Hue, Color, Invalid, Polygon]
+      expect(SupportTableData.support_table_classes).to eq [Shade, Group, Hue, Color, Invalid, Polygon, Size]
     end
   end
 

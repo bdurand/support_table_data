@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "active_support/core_ext/module/redefine_method"
+
 # This concern can be mixed into models that represent static support tables. These are small tables
 # that have a limited number of rows, and have values that are often tied to the logic in the code.
 #
@@ -97,15 +99,22 @@ module SupportTableData
     #   files will be deleted. Use with caution.
     # @return [Array<Hash>] List of saved changes for each record that was created or modified.
     def sync_table_data!(delete_missing: false)
-      return unless table_exists?
+      return [] unless table_exists?
 
-      canonical_data = support_table_data.each_with_object({}) do |attributes, hash|
-        hash[attributes[support_table_key_attribute].to_s] = attributes
-      end
-      records = where(support_table_key_attribute => canonical_data.keys)
-      changes = []
+      retried = false
 
       begin
+        canonical_data = support_table_data.each_with_object({}) do |attributes, hash|
+          hash[attributes[support_table_key_attribute].to_s] = attributes
+        end
+
+        if delete_missing && canonical_data.empty? && exists?
+          raise ArgumentError.new("Refusing to sync #{name} with delete_missing enabled because the data files contain no rows; this would delete every row in the table")
+        end
+
+        records = where(support_table_key_attribute => canonical_data.keys)
+        changes = []
+
         ActiveSupport::Notifications.instrument("support_table_data.sync", class: self) do
           synced_ids = []
 
@@ -141,11 +150,17 @@ module SupportTableData
             end
           end
         end
+        changes
       rescue ActiveRecord::RecordInvalid => e
         raise SupportTableData::ValidationError.new(e.record)
-      end
+      rescue ActiveRecord::RecordNotUnique
+        # A concurrent sync from another process may have inserted the same rows.
+        # The transaction was rolled back, so retry once to pick up those rows.
+        raise if retried
 
-      changes
+        retried = true
+        retry
+      end
     end
 
     # Add a data file that contains the support table data. This method can be called multiple times to
@@ -157,9 +172,10 @@ module SupportTableData
     # @return [void]
     def add_support_table_data(data_file_path)
       root_dir = (support_table_data_directory || SupportTableData.data_directory || Dir.pwd)
-      @mutex.synchronize do
-        @support_table_data_files += [File.expand_path(data_file_path, root_dir)]
+      support_table_mutex.synchronize do
+        @support_table_data_files = support_table_data_files + [File.expand_path(data_file_path, root_dir)]
         @support_table_instance_keys = nil
+        @protected_keys = nil
       end
       define_support_table_named_instances
     end
@@ -172,9 +188,11 @@ module SupportTableData
     # @param attributes [String, Symbol] The names of the attributes to add helper methods for.
     # @return [void]
     def named_instance_attribute_helpers(*attributes)
-      @mutex.synchronize do
+      support_table_mutex.synchronize do
         attributes.flatten.collect(&:to_s).each do |attribute|
-          @support_table_attribute_helpers = @support_table_attribute_helpers.merge(attribute => [])
+          next if support_table_attribute_helpers_map.include?(attribute)
+
+          @support_table_attribute_helpers = support_table_attribute_helpers_map.merge(attribute => [])
         end
       end
       define_support_table_named_instances
@@ -185,7 +203,7 @@ module SupportTableData
     #
     # @return [Array<String>] List of attribute names.
     def support_table_attribute_helpers
-      @support_table_attribute_helpers.keys
+      support_table_attribute_helpers_map.keys
     end
 
     # Get the data for the support table from the data files.
@@ -193,7 +211,7 @@ module SupportTableData
     # @return [Array<Hash>] List of attributes for all records in the data files.
     def support_table_data
       data = {}
-      @support_table_data_files.each do |data_file_path|
+      support_table_data_files.each do |data_file_path|
         file_data = support_table_parse_data_file(data_file_path)
         file_data = file_data.values if file_data.is_a?(Hash)
         file_data = Array(file_data).flatten
@@ -218,7 +236,7 @@ module SupportTableData
       data = {}
       name = name.to_s
 
-      @support_table_data_files.each do |data_file_path|
+      support_table_data_files.each do |data_file_path|
         file_data = support_table_parse_data_file(data_file_path)
         next unless file_data.is_a?(Hash)
 
@@ -237,7 +255,7 @@ module SupportTableData
     #
     # @return [Array<String>] List of all instance names.
     def instance_names
-      @support_table_instance_names.keys
+      support_table_instance_names_map.keys
     end
 
     # Load a named instance from the database.
@@ -247,36 +265,54 @@ module SupportTableData
     # @raise [ActiveRecord::RecordNotFound] If the instance does not exist.
     def named_instance(instance_name)
       instance_name = instance_name.to_s
-      find_by!(support_table_key_attribute => @support_table_instance_names[instance_name])
+      instances = support_table_instance_names_map
+      unless instances.include?(instance_name)
+        raise ActiveRecord::RecordNotFound.new("Couldn't find #{name} named instance #{instance_name.inspect}")
+      end
+
+      find_by!(support_table_key_attribute => instances[instance_name])
     end
 
     # Get the key values for all instances loaded from the data files.
     #
     # @return [Array] List of all the key attribute values.
     def instance_keys
-      if @support_table_instance_keys.nil?
-        values = []
-        support_table_data.each do |attributes|
-          key_value = attributes[support_table_key_attribute]
-          instance = new
-          instance.send(:"#{support_table_key_attribute}=", key_value)
-          values << instance.send(support_table_key_attribute)
+      keys = @support_table_instance_keys
+      if keys.nil?
+        support_table_mutex.synchronize do
+          keys = @support_table_instance_keys
+          if keys.nil?
+            values = []
+            support_table_data.each do |attributes|
+              key_value = attributes[support_table_key_attribute]
+              instance = new
+              instance.send(:"#{support_table_key_attribute}=", key_value)
+              values << instance.send(support_table_key_attribute)
+            end
+            keys = values.uniq
+            @support_table_instance_keys = keys
+          end
         end
-        @support_table_instance_keys = values.uniq
       end
-      @support_table_instance_keys
+      keys
     end
 
     # Return true if the instance has data being managed from a data file.
     #
     # @return [Boolean]
     def protected_instance?(instance)
-      unless defined?(@protected_keys)
-        keys = support_table_data.collect { |attributes| attributes[support_table_key_attribute].to_s }
-        @protected_keys = keys
+      keys = @protected_keys
+      if keys.nil?
+        support_table_mutex.synchronize do
+          keys = @protected_keys
+          if keys.nil?
+            keys = support_table_data.collect { |attributes| attributes[support_table_key_attribute].to_s }
+            @protected_keys = keys
+          end
+        end
       end
 
-      @protected_keys.include?(instance[support_table_key_attribute].to_s)
+      keys.include?(instance[support_table_key_attribute].to_s)
     end
 
     # Explicitly define other support tables that this model depends on. A support table depends
@@ -290,20 +326,34 @@ module SupportTableData
     # @param class_names [String] List of class names that this support table depends on.
     # @return [void]
     def support_table_dependency(*class_names)
-      @support_table_dependencies += class_names.flatten.collect(&:to_s)
+      support_table_mutex.synchronize do
+        @support_table_dependencies = support_table_dependency_names + class_names.flatten.collect(&:to_s)
+      end
     end
 
     private
 
     def define_support_table_named_instances
-      @support_table_data_files.each do |file_path|
+      merged_data = {}
+
+      support_table_data_files.each do |file_path|
         data = support_table_parse_data_file(file_path)
         next unless data.is_a?(Hash)
 
         data.each do |name, attributes|
-          @mutex.synchronize do
-            define_support_table_named_instance_methods(name, attributes)
+          name = name.to_s
+          existing = merged_data[name]
+          merged_data[name] = if existing.is_a?(Hash) && attributes.is_a?(Hash)
+            existing.merge(attributes)
+          else
+            attributes
           end
+        end
+      end
+
+      merged_data.each do |name, attributes|
+        support_table_mutex.synchronize do
+          define_support_table_named_instance_methods(name, attributes)
         end
       end
     end
@@ -313,32 +363,43 @@ module SupportTableData
       return if method_name.start_with?("_")
 
       unless attributes.is_a?(Hash)
-        raise ArgumentError.new("Cannot define named instance #{method_name} on #{name}; value must be a Hash")
+        raise ArgumentError.new("Cannot define named instance #{method_name} on #{self.name}; value must be a Hash")
       end
 
       unless method_name.match?(/\A[a-z][a-z0-9_]+\z/)
-        raise ArgumentError.new("Cannot define named instance #{method_name} on #{name}; name contains illegal characters")
+        raise ArgumentError.new("Cannot define named instance #{method_name} on #{self.name}; name contains illegal characters")
       end
 
       key_value = attributes[support_table_key_attribute]
+      instance_names_map = support_table_instance_names_map
 
-      unless @support_table_instance_names.include?(method_name)
+      if instance_names_map.include?(method_name)
+        if instance_names_map[method_name] != key_value
+          define_support_table_instance_helper(method_name, support_table_key_attribute, key_value, redefine: true)
+          define_support_table_predicates_helper("#{method_name}?", support_table_key_attribute, key_value, redefine: true)
+          @support_table_instance_names = instance_names_map.merge(method_name => key_value)
+        end
+      else
         define_support_table_instance_helper(method_name, support_table_key_attribute, key_value)
         define_support_table_predicates_helper("#{method_name}?", support_table_key_attribute, key_value)
-        @support_table_instance_names = @support_table_instance_names.merge(method_name => key_value)
+        @support_table_instance_names = instance_names_map.merge(method_name => key_value)
       end
 
-      @support_table_attribute_helpers.each do |attribute_name, defined_methods|
+      support_table_attribute_helpers_map.each do |attribute_name, defined_methods|
         attribute_method_name = "#{method_name}_#{attribute_name}"
-        next if defined_methods.include?(attribute_method_name)
-
-        define_support_table_instance_attribute_helper(attribute_method_name, attributes[attribute_name])
-        defined_methods << attribute_method_name
+        if defined_methods.include?(attribute_method_name)
+          define_support_table_instance_attribute_helper(attribute_method_name, attributes[attribute_name], redefine: true)
+        else
+          define_support_table_instance_attribute_helper(attribute_method_name, attributes[attribute_name])
+          defined_methods << attribute_method_name
+        end
       end
     end
 
-    def define_support_table_instance_helper(method_name, attribute_name, attribute_value)
-      if respond_to?(method_name, true)
+    def define_support_table_instance_helper(method_name, attribute_name, attribute_value, redefine: false)
+      if redefine
+        singleton_class.silence_redefinition_of_method(method_name)
+      elsif respond_to?(method_name, true)
         raise ArgumentError.new("Could not define support table helper method #{name}.#{method_name} because it is already a defined method")
       end
 
@@ -349,8 +410,10 @@ module SupportTableData
       RUBY
     end
 
-    def define_support_table_instance_attribute_helper(method_name, attribute_value)
-      if respond_to?(method_name, true)
+    def define_support_table_instance_attribute_helper(method_name, attribute_value, redefine: false)
+      if redefine
+        singleton_class.silence_redefinition_of_method(method_name)
+      elsif respond_to?(method_name, true)
         raise ArgumentError.new("Could not define support table helper method #{name}.#{method_name} because it is already a defined method")
       end
 
@@ -361,14 +424,16 @@ module SupportTableData
       RUBY
     end
 
-    def define_support_table_predicates_helper(method_name, attribute_name, attribute_value)
-      if method_defined?(method_name) || private_method_defined?(method_name)
+    def define_support_table_predicates_helper(method_name, attribute_name, attribute_value, redefine: false)
+      if redefine
+        silence_redefinition_of_method(method_name)
+      elsif method_defined?(method_name) || private_method_defined?(method_name)
         raise ArgumentError.new("Could not define support table helper method #{name}##{method_name} because it is already a defined method")
       end
 
       class_eval <<~RUBY, __FILE__, __LINE__ + 1
         def #{method_name}
-          #{attribute_name} == #{attribute_value.inspect}
+          #{attribute_name} == self.class.type_for_attribute(#{attribute_name.inspect}).cast(#{attribute_value.inspect})
         end
       RUBY
     end
@@ -390,7 +455,13 @@ module SupportTableData
         end
       else
         require "yaml" unless defined?(YAML)
-        data = YAML.safe_load(file_data)
+        require "date" unless defined?(Date)
+        data = if Psych::VERSION.to_f >= 3.1
+          YAML.safe_load(file_data, permitted_classes: [Date, Time], aliases: true)
+        else
+          # Positional arguments for Psych < 3.1 (Ruby 2.5).
+          YAML.safe_load(file_data, [Date, Time], [], true)
+        end
       end
 
       data
@@ -399,7 +470,7 @@ module SupportTableData
     def support_table_record_changed?(record, seen = Set.new)
       return true if record.changed?
 
-      seen << self
+      seen << record
       record.class.reflect_on_all_associations.detect do |reflection|
         next false if reflection.belongs_to?
         next false unless reflection.options[:autosave]
@@ -408,6 +479,31 @@ module SupportTableData
           support_table_record_changed?(child, seen) unless seen.include?(child)
         end
       end
+    end
+
+    # The class level state used by the concern is stored in instance variables on the
+    # class where the concern was included. These readers fall back to the superclass
+    # so that single table inheritance subclasses share the state defined on their
+    # base class rather than crashing on uninitialized instance variables.
+
+    def support_table_mutex
+      @mutex || (superclass.include?(SupportTableData) ? superclass.send(:support_table_mutex) : nil)
+    end
+
+    def support_table_data_files
+      @support_table_data_files || (superclass.include?(SupportTableData) ? superclass.send(:support_table_data_files) : [])
+    end
+
+    def support_table_instance_names_map
+      @support_table_instance_names || (superclass.include?(SupportTableData) ? superclass.send(:support_table_instance_names_map) : {})
+    end
+
+    def support_table_attribute_helpers_map
+      @support_table_attribute_helpers || (superclass.include?(SupportTableData) ? superclass.send(:support_table_attribute_helpers_map) : {})
+    end
+
+    def support_table_dependency_names
+      @support_table_dependencies || (superclass.include?(SupportTableData) ? superclass.send(:support_table_dependency_names) : [])
     end
   end
 
@@ -481,7 +577,7 @@ module SupportTableData
       if SupportTableData.data_directory && File.exist?(SupportTableData.data_directory) && File.directory?(SupportTableData.data_directory)
         Dir.glob(File.join(SupportTableData.data_directory, "**", "*")).sort.each do |file_name|
           file_name = file_name.delete_prefix("#{SupportTableData.data_directory}#{File::SEPARATOR}")
-          class_name = file_name.sub(/\.[^.]*/, "").singularize.camelize
+          class_name = file_name.sub(/\.[^.]*\z/, "").singularize.camelize
           class_name.safe_constantize
         end
       end
@@ -514,7 +610,7 @@ module SupportTableData
     #
     # @return [Array<Class>]
     def support_table_dependencies(klass)
-      dependencies = klass.instance_variable_get(:@support_table_dependencies).collect(&:constantize)
+      dependencies = klass.send(:support_table_dependency_names).collect(&:constantize)
 
       klass.reflections.values.each do |reflection|
         next if reflection.polymorphic?
@@ -523,8 +619,8 @@ module SupportTableData
         next unless reflection.belongs_to? || reflection.through_reflection?
         next if dependencies.include?(reflection.klass)
 
-        explicit_dependencies = reflection.klass.instance_variable_get(:@support_table_dependencies)
-        next if explicit_dependencies&.include?(klass.name)
+        explicit_dependencies = reflection.klass.send(:support_table_dependency_names)
+        next if explicit_dependencies.include?(klass.name)
 
         dependencies << reflection.klass
       rescue => e

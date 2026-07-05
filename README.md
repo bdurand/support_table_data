@@ -279,6 +279,10 @@ SupportTableData.sync_all!(delete_missing: true)
 > [!CAUTION]
 > Use `delete_missing` with care. It will delete any records in the table that are not defined in the data files, which may include user-created data or fail due to foreign key constraints.
 
+As a safeguard, `sync_table_data!` will raise an `ArgumentError` rather than delete anything when `delete_missing` is enabled but the data files contain no rows (for instance, when a data file was accidentally emptied or truncated).
+
+It is recommended to add a unique database index on the key attribute column. Concurrent syncs from multiple processes (for example, parallel deployment jobs) could otherwise insert duplicate rows. If a sync hits a uniqueness violation from a concurrent insert, it will automatically retry once to pick up the other process' changes.
+
 The number of records contained in data files should be fairly small (ideally fewer than 100). It is possible to load just a subset of rows in a large table because only the rows listed in the data files will be synced. You can use this feature if your table allows user-entered data, but has a few rows that must exist for the code to work.
 
 Loading data is done inside a database transaction. No changes will be persisted to the database unless all rows for a model can be synced.

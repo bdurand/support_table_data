@@ -46,6 +46,13 @@ ActiveRecord::Base.connection.tap do |connection|
     t.string :type
     t.integer :side_count
   end
+
+  connection.create_table(:sizes) do |t|
+    t.string :name
+    t.string :label
+    t.boolean :active
+    t.date :introduced_on
+  end
 end
 
 # Lazy load model classes
@@ -57,6 +64,7 @@ autoload :Invalid, File.expand_path("models/invalid.rb", __dir__)
 autoload :Polygon, File.expand_path("models/polygon.rb", __dir__)
 autoload :Rectangle, File.expand_path("models/rectangle.rb", __dir__)
 autoload :Shade, File.expand_path("models/shade.rb", __dir__)
+autoload :Size, File.expand_path("models/size.rb", __dir__)
 autoload :ShadeHue, File.expand_path("models/shade_hue.rb", __dir__)
 autoload :Thing, File.expand_path("models/thing.rb", __dir__)
 autoload :Triangle, File.expand_path("models/triangle.rb", __dir__)

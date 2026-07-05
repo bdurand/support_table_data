@@ -7,7 +7,7 @@ module SupportTableData
 
       BEGIN_YARD_COMMENT = "# Begin YARD docs for support_table_data"
       END_YARD_COMMENT = "# End YARD docs for support_table_data"
-      YARD_COMMENT_REGEX = /^(?<indent>[ \t]*)#{BEGIN_YARD_COMMENT}.*^[ \t]*#{END_YARD_COMMENT}$/m
+      YARD_COMMENT_REGEX = /^(?<indent>[ \t]*)#{BEGIN_YARD_COMMENT}.*?^[ \t]*#{END_YARD_COMMENT}$/m
       CLASS_DEF_REGEX = /^[ \t]*class [a-zA-Z_0-9:]+.*?$/
       UPDATE_COMMAND_COMMENT = "# To update these docs, run `bundle exec rake support_table_data:yard_docs`"
 

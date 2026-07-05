@@ -1,0 +1,19 @@
+small: &small
+  id: "1"
+  name: small
+  label: Small
+  active: true
+  introduced_on: 2020-01-15
+
+medium:
+  <<: *small
+  id: 2
+  name: medium
+  label: Medium
+
+large:
+  id: 3
+  name: large
+  label: Big
+  active: false
+  introduced_on: 2021-06-30
