@@ -1,6 +1,6 @@
 .DS_Store
 
-/.bundle/
+.bundle/
 /vendor/bundle
 /lib/bundler/man/
 
@@ -30,4 +30,4 @@ gemfiles/*.gemfile.lock
 .claude/
 .conductor/
 .cursor/
-/.config
+.config
