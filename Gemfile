@@ -5,6 +5,7 @@ gemspec
 # Exclude development-only gems from dependabot.
 unless ENV["DEPENDABOT"]
   gem "sqlite3"
+  gem "csv"
 
   gem "rake"
   gem "rspec", "~> 3.11"

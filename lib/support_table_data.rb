@@ -21,7 +21,7 @@ module SupportTableData
 
   included do
     # Internal variables used for memoization.
-    @mutex = Mutex.new
+    @support_table_mutex = Mutex.new
     @support_table_data_files = []
     @support_table_attribute_helpers = {}
     @support_table_instance_names = {}
@@ -171,7 +171,7 @@ module SupportTableData
     #   this model or the global directory set with SupportTableData.data_directory.
     # @return [void]
     def add_support_table_data(data_file_path)
-      root_dir = (support_table_data_directory || SupportTableData.data_directory || Dir.pwd)
+      root_dir = support_table_data_directory || SupportTableData.data_directory || Dir.pwd
       support_table_mutex.synchronize do
         @support_table_data_files = support_table_data_files + [File.expand_path(data_file_path, root_dir)]
         @support_table_instance_keys = nil
@@ -189,10 +189,15 @@ module SupportTableData
     # @return [void]
     def named_instance_attribute_helpers(*attributes)
       support_table_mutex.synchronize do
-        attributes.flatten.collect(&:to_s).each do |attribute|
-          next if support_table_attribute_helpers_map.include?(attribute)
+        # Single table inheritance subclasses read the map from their base class. Copy it
+        # (including the lists of method names that have been defined) the first time a
+        # subclass registers its own helpers so the two classes don't mutate each other's state.
+        @support_table_attribute_helpers ||= support_table_attribute_helpers_map.transform_values(&:dup)
 
-          @support_table_attribute_helpers = support_table_attribute_helpers_map.merge(attribute => [])
+        attributes.flatten.collect(&:to_s).each do |attribute|
+          next if @support_table_attribute_helpers.include?(attribute)
+
+          @support_table_attribute_helpers = @support_table_attribute_helpers.merge(attribute => [])
         end
       end
       define_support_table_named_instances
@@ -210,19 +215,47 @@ module SupportTableData
     #
     # @return [Array<Hash>] List of attributes for all records in the data files.
     def support_table_data
-      data = {}
+      records = []
+      named_records = {}
+
       support_table_data_files.each do |data_file_path|
         file_data = support_table_parse_data_file(data_file_path)
-        file_data = file_data.values if file_data.is_a?(Hash)
-        file_data = Array(file_data).flatten
-        file_data.each do |attributes|
-          key_value = attributes[support_table_key_attribute].to_s
-          existing = data[key_value]
-          if existing
-            existing.merge!(attributes)
-          else
-            data[key_value] = attributes
+
+        if file_data.is_a?(Hash)
+          file_data.each do |instance_name, attributes|
+            unless attributes.is_a?(Hash)
+              # A name mapped to a list of records (i.e. a name beginning with an underscore)
+              # holds anonymous records that are only identified by the key attribute.
+              Array(attributes).flatten.each { |record| records << record.dup }
+              next
+            end
+
+            # Records are merged by their name so that a later data file can override
+            # attributes on a named record without having to repeat the key attribute.
+            instance_name = instance_name.to_s
+            existing = named_records[instance_name]
+            if existing
+              existing.merge!(attributes)
+            else
+              record = attributes.dup
+              named_records[instance_name] = record
+              records << record
+            end
           end
+        else
+          Array(file_data).flatten.each { |record| records << record.dup }
+        end
+      end
+
+      # Records that resolve to the same key attribute value are merged together.
+      data = {}
+      records.each do |attributes|
+        key_value = attributes[support_table_key_attribute].to_s
+        existing = data[key_value]
+        if existing
+          existing.merge!(attributes)
+        else
+          data[key_value] = attributes
         end
       end
 
@@ -456,7 +489,7 @@ module SupportTableData
       else
         require "yaml" unless defined?(YAML)
         require "date" unless defined?(Date)
-        data = if Psych::VERSION.to_f >= 3.1
+        data = if Gem::Version.new(Psych::VERSION) >= Gem::Version.new("3.1.0.pre1")
           YAML.safe_load(file_data, permitted_classes: [Date, Time], aliases: true)
         else
           # Positional arguments for Psych < 3.1 (Ruby 2.5).
@@ -487,7 +520,7 @@ module SupportTableData
     # base class rather than crashing on uninitialized instance variables.
 
     def support_table_mutex
-      @mutex || (superclass.include?(SupportTableData) ? superclass.send(:support_table_mutex) : nil)
+      @support_table_mutex || (superclass.include?(SupportTableData) ? superclass.send(:support_table_mutex) : nil)
     end
 
     def support_table_data_files

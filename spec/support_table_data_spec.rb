@@ -261,6 +261,13 @@ describe SupportTableData do
       expect(Size.small_label).to eq "Small"
       expect(Size.large_label).to eq "Large"
     end
+
+    it "syncs overridden attributes to the existing record instead of creating a new one" do
+      Size.sync_table_data!
+      expect(Size.count).to eq 3
+      expect(Size.find(3).label).to eq "Large"
+      expect(Size.large_label).to eq Size.find(3).label
+    end
   end
 
   describe "single table inheritance" do
@@ -361,6 +368,18 @@ describe SupportTableData do
         "hex" => "0xFF0000",
         "group_name" => "primary",
         "hue_name" => "red"
+      })
+    end
+
+    it "merges overrides for a named instance that do not repeat the key attribute" do
+      data = Size.support_table_data
+      expect(data.size).to eq 3
+      expect(data).to include({
+        "id" => 3,
+        "name" => "large",
+        "label" => "Large",
+        "active" => false,
+        "introduced_on" => Date.new(2021, 6, 30)
       })
     end
 

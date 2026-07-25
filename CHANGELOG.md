@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Single table inheritance subclasses no longer raise `NoMethodError` from `instance_names`, `instance_keys`, `protected_instance?`, and other class methods. Subclasses now share the support table state defined on their base class.
 - Named instance helper methods are now redefined when a later data file overrides an attribute or key value, so the helpers always return the merged values that are synced to the database. Previously they permanently returned the values from the first file that defined the named instance.
 - `named_instance_attribute_helpers` can now be called again with an attribute that was already registered without raising an `ArgumentError`.
+- Data files that override attributes on a named instance are now merged by the instance name rather than only by the key attribute. Previously, an override that did not repeat the key attribute value (for example, a file containing only `large:` with a `label`) was treated as a brand new record; the override was never applied to the real row and a row with only the overridden attributes was inserted on every sync.
 - YAML data files can now use anchors/aliases and date/time values. Previously these raised `Psych::AliasesNotEnabled` or `Psych::DisallowedClass` errors.
 - `protected_instance?` no longer returns stale results when data files are added after the protected keys were first computed.
 - Fixed broken cycle detection in the autosave association check during syncs that could cause infinite recursion on cyclic autosave associations.
@@ -21,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `named_instance` now raises a clear `ActiveRecord::RecordNotFound` error for undefined named instances instead of querying the database for a `nil` key (which could silently return a row with a `NULL` key value).
 - Memoized class-level state is now consistently synchronized with the class mutex to avoid races on non-MRI Ruby implementations.
 - Setting `config.support_table.auto_sync = false` before the gem is loaded is no longer overwritten back to `true` by the Railtie.
-- The documentation tasks no longer corrupt model source files that contain duplicated generated YARD doc blocks (e.g. from a bad merge); the regex that finds the generated block is no longer greedy.
+- The documentation tasks no longer corrupt model source files that contain duplicated generated YARD doc blocks (e.g. from a bad merge); the regex that finds the generated block is no longer greedy and all duplicated blocks are now removed so the file is left with exactly one block.
 - Data file names containing extra dots no longer break the class name detection used by `SupportTableData.sync_all!` to eager load models.
 - Error messages for invalid named instance definitions now include the model class name instead of repeating the instance name.
 

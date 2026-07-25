@@ -32,7 +32,7 @@ module SupportTableData
       #
       # @return [String]
       def source_without_yard_docs
-        "#{source.sub(YARD_COMMENT_REGEX, "").rstrip}#{trailing_newline}"
+        "#{source.gsub(YARD_COMMENT_REGEX, "").rstrip}#{trailing_newline}"
       end
 
       # Return the source code with the generated YARD documentation added.
@@ -63,8 +63,10 @@ module SupportTableData
           updated_source << "\n#{indent}end" if has_class_def
           updated_source << "\n#{indent}# rubocop:enable all"
           updated_source << "\n#{indent}#{END_YARD_COMMENT}"
-          updated_source << source[existing_yard_docs.end(0)..-1]
-          updated_source
+          # Strip out any duplicate generated blocks (i.e. left over from a bad merge)
+          # so that the file is left with exactly one block.
+          updated_source << source[existing_yard_docs.end(0)..].gsub(YARD_COMMENT_REGEX, "")
+          "#{updated_source.rstrip}#{trailing_newline}"
         else
           yard_comments = <<~SOURCE.chomp("\n")
             #{BEGIN_YARD_COMMENT}

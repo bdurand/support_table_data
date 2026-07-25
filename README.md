@@ -68,6 +68,8 @@ class Status < ApplicationRecord
 
 You cannot update the value of the key attribute in a record in the data file. If you do, a new record will be created and the existing record will be left unchanged.
 
+When you add multiple data files, records defined in more than one file are merged together, with later files taking precedence. Records in files defined as a hash of named instances are matched by the instance name, so an override file only needs to specify the attributes it is changing. Records in files defined as a list are matched by the key attribute value, which must be repeated in each file.
+
 You can specify data files as relative paths. This can be done by setting the `SupportTableData.data_directory` value. You can override this value for a model by setting the `support_table_data_directory` attribute on its class. Otherwise, relative file paths will be resolved from the current working directory. You must define the directory to load relative files from before loading your model classes.
 
 In a Rails application, `SupportTableData.data_directory` will be automatically set to `db/support_tables/`. This can be overridden by setting the `config.support_table.data_directory` option in the Rails application configuration.

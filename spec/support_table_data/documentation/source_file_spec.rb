@@ -188,6 +188,36 @@ RSpec.describe SupportTableData::Documentation::SourceFile do
       expect(result).to match(/class Color < ActiveRecord::Base.*# Begin YARD docs.*# @!method self\.black.*# End YARD docs.*def some_method/m)
     end
 
+    it "removes duplicated documentation blocks while preserving user code" do
+      source_with_duplicate_blocks = <<~RUBY
+        class Color < ActiveRecord::Base
+          include SupportTableData
+
+          # Begin YARD docs for support_table_data
+          # Old docs
+          # End YARD docs for support_table_data
+
+          def user_method
+          end
+
+          # Begin YARD docs for support_table_data
+          # Old duplicated docs
+          # End YARD docs for support_table_data
+        end
+      RUBY
+
+      source_file = SupportTableData::Documentation::SourceFile.new(Color, color_path)
+      allow(source_file).to receive(:source).and_return(source_with_duplicate_blocks)
+
+      result = source_file.source_with_yard_docs
+
+      expect(result).to include("def user_method")
+      expect(result).not_to include("# Old docs")
+      expect(result).not_to include("# Old duplicated docs")
+      expect(result.scan(SupportTableData::Documentation::SourceFile::BEGIN_YARD_COMMENT).size).to eq 1
+      expect(result.scan(SupportTableData::Documentation::SourceFile::END_YARD_COMMENT).size).to eq 1
+    end
+
     it "preserves indentation when replacing inline YARD docs" do
       source_with_indented_docs = <<~RUBY
         class Color < ActiveRecord::Base
