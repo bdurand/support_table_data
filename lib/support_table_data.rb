@@ -464,10 +464,9 @@ module SupportTableData
         raise ArgumentError.new("Could not define support table helper method #{name}##{method_name} because it is already a defined method")
       end
 
-      cast_value = type_for_attribute(attribute_name).cast(attribute_value)
       class_eval <<~RUBY, __FILE__, __LINE__ + 1
         def #{method_name}
-          #{attribute_name} == #{cast_value.inspect}
+          #{attribute_name} == self.class.type_for_attribute(#{attribute_name.inspect}).cast(#{attribute_value.inspect})
         end
       RUBY
     end

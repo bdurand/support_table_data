@@ -59,6 +59,8 @@ module SupportTableData
         end
 
         def model_file_path(klass)
+          return nil unless klass.name
+
           file_path = "#{klass.name.underscore}.rb"
           model_path = nil
 
