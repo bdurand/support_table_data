@@ -2,7 +2,7 @@
 
 require "spec_helper"
 
-describe SupportTableData do
+RSpec.describe SupportTableData do
   let(:red) { Color.find_by(name: "Red") }
   let(:green) { Color.find_by(name: "Green") }
   let(:blue) { Color.find_by(name: "Blue") }
