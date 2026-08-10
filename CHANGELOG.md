@@ -15,7 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `named_instance_attribute_helpers` can now be called again with an attribute that was already registered without raising an `ArgumentError`.
 - Data files that override attributes on a named instance are now merged by the instance name rather than only by the key attribute. Previously, an override that did not repeat the key attribute value (for example, a file containing only `large:` with a `label`) was treated as a brand new record; the override was never applied to the real row and a row with only the overridden attributes was inserted on every sync.
 - YAML data files can now use anchors/aliases and date/time values. Previously these raised `Psych::AliasesNotEnabled` or `Psych::DisallowedClass` errors.
-- `protected_instance?` no longer returns stale results when data files are added after the protected keys were first computed.
+- `protected_instance?` and `instance_keys` no longer return stale results when data files are added after their values were first computed. This includes single table inheritance subclasses that computed their values before a data file was added to their base class.
+- `protected_instance?` and `instance_keys` now include data files added to single table inheritance subclasses when called on a base class. Previously rows managed by a subclass' data file were reported as unprotected by the base class even though they live in the same table.
+- `sync_table_data!` with `delete_missing: true` no longer deletes rows that are managed by data files added to single table inheritance subclasses. Previously syncing the base class deleted rows that the subclass was responsible for syncing.
 - Fixed broken cycle detection in the autosave association check during syncs that could cause infinite recursion on cyclic autosave associations.
 - `sync_table_data!` now retries once on `ActiveRecord::RecordNotUnique` errors caused by concurrent syncs inserting the same rows from another process.
 - `sync_table_data!` now returns an empty array instead of `nil` when the table does not exist.

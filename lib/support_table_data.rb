@@ -146,7 +146,15 @@ module SupportTableData
             end
 
             if delete_missing
-              where.not(primary_key => synced_ids).destroy_all
+              missing_records = where.not(primary_key => synced_ids)
+
+              # Rows managed by data files added to single table inheritance subclasses live in
+              # this table, but they are synced by the subclass, so they are not missing rows.
+              # Keys from this class' own data files are already excluded by the synced ids.
+              managed_keys = instance_keys.compact
+              missing_records = missing_records.where.not(support_table_key_attribute => managed_keys) unless managed_keys.empty?
+
+              missing_records.destroy_all
             end
           end
         end
@@ -174,8 +182,6 @@ module SupportTableData
       root_dir = support_table_data_directory || SupportTableData.data_directory || Dir.pwd
       support_table_mutex.synchronize do
         @support_table_data_files = support_table_data_files + [File.expand_path(data_file_path, root_dir)]
-        @support_table_instance_keys = nil
-        @protected_keys = nil
       end
       define_support_table_named_instances
     end
@@ -215,10 +221,19 @@ module SupportTableData
     #
     # @return [Array<Hash>] List of attributes for all records in the data files.
     def support_table_data
+      support_table_data_for_files(support_table_data_files)
+    end
+
+    # Get the data for the support table from a specific list of data files.
+    #
+    # @param data_files [Array<String>] The paths of the data files to read.
+    # @return [Array<Hash>] List of attributes for all records in the data files.
+    # @api private
+    def support_table_data_for_files(data_files)
       records = []
       named_records = {}
 
-      support_table_data_files.each do |data_file_path|
+      data_files.each do |data_file_path|
         file_data = support_table_parse_data_file(data_file_path)
 
         if file_data.is_a?(Hash)
@@ -306,43 +321,33 @@ module SupportTableData
       find_by!(support_table_key_attribute => instances[instance_name])
     end
 
-    # Get the key values for all instances loaded from the data files.
+    # Get the key values for all instances loaded from the data files. Data files added to
+    # single table inheritance subclasses are included since those rows live in this table too.
     #
     # @return [Array] List of all the key attribute values.
     def instance_keys
-      keys = @support_table_instance_keys
-      if keys.nil?
-        support_table_mutex.synchronize do
-          keys = @support_table_instance_keys
-          if keys.nil?
-            values = []
-            support_table_data.each do |attributes|
-              key_value = attributes[support_table_key_attribute]
-              instance = new
-              instance.send(:"#{support_table_key_attribute}=", key_value)
-              values << instance.send(support_table_key_attribute)
-            end
-            keys = values.uniq
-            @support_table_instance_keys = keys
-          end
+      support_table_cached_data_value(:@support_table_instance_keys, support_table_data_files_with_descendants) do |data_files|
+        values = []
+        support_table_data_for_files(data_files).each do |attributes|
+          key_value = attributes[support_table_key_attribute]
+          instance = new
+          instance.send(:"#{support_table_key_attribute}=", key_value)
+          values << instance.send(support_table_key_attribute)
         end
+        values.uniq
       end
-      keys
     end
 
-    # Return true if the instance has data being managed from a data file.
+    # Return true if the instance has data being managed from a data file. Instances are matched
+    # on the key attribute only. Single table inheritance types are intentionally not considered
+    # since syncing also matches existing rows on just the key attribute and will overwrite a row
+    # regardless of the type it currently has. Data files added to single table inheritance
+    # subclasses are included since those rows live in this table too.
     #
     # @return [Boolean]
     def protected_instance?(instance)
-      keys = @protected_keys
-      if keys.nil?
-        support_table_mutex.synchronize do
-          keys = @protected_keys
-          if keys.nil?
-            keys = support_table_data.collect { |attributes| attributes[support_table_key_attribute].to_s }
-            @protected_keys = keys
-          end
-        end
+      keys = support_table_cached_data_value(:@support_table_protected_keys, support_table_data_files_with_descendants) do |data_files|
+        support_table_data_for_files(data_files).collect { |attributes| attributes[support_table_key_attribute].to_s }
       end
 
       keys.include?(instance[support_table_key_attribute].to_s)
@@ -507,6 +512,55 @@ module SupportTableData
           support_table_record_changed?(child, seen) unless seen.include?(child)
         end
       end
+    end
+
+    # Memoize a value calculated from the data files in an instance variable on this class.
+    # The list of data files used to calculate the value is cached along with it so that the
+    # value is recalculated whenever the list changes. This keeps the value from going stale
+    # when a data file is added after it was first calculated, including when the file is added
+    # to a base class after a single table inheritance subclass has cached its own copy or when
+    # a subclass that adds its own data files is loaded lazily.
+    #
+    # @param variable_name [Symbol] The name of the instance variable to memoize the value in.
+    # @param data_files [Array<String>] The data files the value is calculated from. These are
+    #   yielded to the block and cached with the value so it can be invalidated.
+    # @return [Object] The cached value.
+    def support_table_cached_data_value(variable_name, data_files)
+      cached = instance_variable_get(variable_name)
+      return cached.last if cached && cached.first == data_files
+
+      support_table_mutex.synchronize do
+        cached = instance_variable_get(variable_name)
+        unless cached && cached.first == data_files
+          cached = [data_files.dup.freeze, yield(data_files)].freeze
+          instance_variable_set(variable_name, cached)
+        end
+      end
+
+      cached.last
+    end
+
+    # Get the list of data files for this class along with any added to single table inheritance
+    # subclasses. Rows from a subclass' data files live in the same table, so they need to be
+    # included when determining which rows in the table are managed from data files.
+    #
+    # Note that this can only detect subclasses that have already been loaded by the application.
+    #
+    # @return [Array<String>] List of data file paths.
+    def support_table_data_files_with_descendants
+      files = support_table_data_files
+
+      descendants.each do |subclass|
+        next unless subclass.include?(SupportTableData)
+
+        subclass_files = subclass.send(:support_table_data_files)
+        # Subclasses without their own data files inherit the exact same array from this class.
+        next if subclass_files.equal?(files)
+
+        files += (subclass_files - files)
+      end
+
+      files
     end
 
     # The class level state used by the concern is stored in instance variables on the

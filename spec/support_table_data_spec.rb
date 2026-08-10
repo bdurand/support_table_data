@@ -281,6 +281,76 @@ RSpec.describe SupportTableData do
       expect(Polygon.rectangle.protected_instance?).to eq true
       expect(Triangle.new(name: "Scalene").protected_instance?).to eq false
     end
+
+    it "protects subclass records regardless of the type in the data files" do
+      # Syncing matches existing rows on just the key attribute, so a record with a key value
+      # from the data files will be overwritten no matter what type it currently has.
+      expect(Triangle.new(name: "Rectangle").protected_instance?).to eq true
+    end
+
+    it "does not delete rows managed by a subclass' data files when delete_missing is true" do
+      base_class = Class.new(ActiveRecord::Base) do
+        include SupportTableData
+
+        self.table_name = "colors"
+      end
+      subclass = Class.new(base_class)
+      base_class.add_support_table_data("colors/named_colors.yml")
+      subclass.add_support_table_data("colors/colors.json")
+
+      subclass.sync_table_data!
+      expect(base_class.where(id: [1, 3, 8, 9]).count).to eq 4
+
+      unmanaged = base_class.new
+      unmanaged.id = 99
+      unmanaged.save!
+
+      base_class.sync_table_data!(delete_missing: true)
+
+      # Rows 8 and 9 are only in the subclass' data file, but they still live in this table.
+      expect(base_class.where(id: [8, 9]).count).to eq 2
+      expect(base_class.exists?(99)).to eq false
+    end
+
+    it "includes data files added to subclasses when called on the base class" do
+      base_class = Class.new(ActiveRecord::Base) do
+        include SupportTableData
+
+        self.table_name = "colors"
+      end
+      subclass = Class.new(base_class)
+      base_class.add_support_table_data("colors/named_colors.yml")
+
+      light_gray = base_class.new
+      light_gray.id = 8
+      expect(base_class.protected_instance?(light_gray)).to eq false
+      expect(base_class.instance_keys).to_not include 8
+
+      # Rows from a subclass' data files live in the same table, so the base class needs to
+      # know about them as well.
+      subclass.add_support_table_data("colors/colors.json")
+      expect(base_class.protected_instance?(light_gray)).to eq true
+      expect(base_class.instance_keys).to include 8
+    end
+
+    it "picks up data files added to the base class after a subclass memoized its values" do
+      base_class = Class.new(ActiveRecord::Base) do
+        include SupportTableData
+
+        self.table_name = "colors"
+      end
+      subclass = Class.new(base_class)
+      base_class.add_support_table_data("colors/named_colors.yml")
+
+      light_gray = subclass.new
+      light_gray.id = 8
+      expect(subclass.protected_instance?(light_gray)).to eq false
+      expect(subclass.instance_keys).to_not include 8
+
+      base_class.add_support_table_data("colors/colors.json")
+      expect(subclass.protected_instance?(light_gray)).to eq true
+      expect(subclass.instance_keys).to include 8
+    end
   end
 
   describe "instance_names" do
