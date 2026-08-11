@@ -47,6 +47,11 @@ ActiveRecord::Base.connection.tap do |connection|
     t.integer :side_count
   end
 
+  connection.create_table(:shapes) do |t|
+    t.string :name
+    t.string :type
+  end
+
   connection.create_table(:sizes) do |t|
     t.string :name
     t.string :label
@@ -64,6 +69,8 @@ autoload :Invalid, File.expand_path("models/invalid.rb", __dir__)
 autoload :Polygon, File.expand_path("models/polygon.rb", __dir__)
 autoload :Rectangle, File.expand_path("models/rectangle.rb", __dir__)
 autoload :Shade, File.expand_path("models/shade.rb", __dir__)
+autoload :Shape, File.expand_path("models/shape.rb", __dir__)
+autoload :Square, File.expand_path("models/square.rb", __dir__)
 autoload :Size, File.expand_path("models/size.rb", __dir__)
 autoload :ShadeHue, File.expand_path("models/shade_hue.rb", __dir__)
 autoload :Thing, File.expand_path("models/thing.rb", __dir__)

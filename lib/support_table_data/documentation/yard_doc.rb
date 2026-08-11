@@ -3,10 +3,6 @@
 module SupportTableData
   module Documentation
     class YardDoc
-      MACRO_FINDER = "support_table_data_finder"
-      MACRO_PREDICATE = "support_table_data_predicate"
-      MACRO_ATTRIBUTE = "support_table_data_attribute"
-
       # @param klass [Class] The model class to generate documentation for
       def initialize(klass)
         @klass = klass
@@ -16,8 +12,7 @@ module SupportTableData
       # is controlled by the model's `support_table_yard_docs` setting:
       #
       # * `:full`    - verbose comment block per method (default)
-      # * `:compact` - shared @!macro definitions plus a short @!method/@!macro
-      #                pair per generated method
+      # * `:compact` - the same tags per method without the prose descriptions
       # * `:none`    - generate no docs at all
       #
       # @return [String, nil] The YARD documentation, or nil if no docs should
@@ -107,16 +102,23 @@ module SupportTableData
         yard_lines.join("\n")
       end
 
+      # The compact format drops the prose description from each method and keeps only the
+      # tags. Every method still needs its own comment block separated by a blank line:
+      # YARD builds one docstring per block, so combining methods into a single block would
+      # both drop the tags for all but the last method and leak the `self.` scope of a
+      # singleton method onto the instance methods that follow it.
       def generate_compact_yard_docs(instance_names)
         yard_lines = ["# @!group Named Instances"]
-        yard_lines << ""
-        yard_lines << compact_preamble
-        yard_lines << ""
-        yard_lines << compact_macro_definitions
 
         instance_names.sort.each do |name|
           yard_lines << ""
-          yard_lines << compact_instance_block(name)
+          yard_lines << compact_instance_helper_yard_doc(name)
+          yard_lines << ""
+          yard_lines << compact_predicate_helper_yard_doc(name)
+          klass.support_table_attribute_helpers.each do |attribute_name|
+            yard_lines << ""
+            yard_lines << compact_attribute_helper_yard_doc(name, attribute_name)
+          end
         end
 
         yard_lines << ""
@@ -125,53 +127,29 @@ module SupportTableData
         yard_lines.join("\n")
       end
 
-      def compact_preamble
+      def compact_instance_helper_yard_doc(name)
         <<~YARD.chomp("\n")
-          # The methods in this group are dynamically defined by support_table_data
-          # for each named instance in the data file. The macros below are the
-          # documentation templates; the per-instance @!method lines that follow
-          # invoke them with the instance name (and attribute name, where applicable).
+          # @!method self.#{name}
+          # @return [#{klass.name}]
+          # @raise [ActiveRecord::RecordNotFound] if the record does not exist
+          # @!visibility public
         YARD
       end
 
-      def compact_macro_definitions
-        attribute_macro = <<~YARD.chomp("\n")
-          # @!macro [new] #{MACRO_ATTRIBUTE}
-          #   Get the +$2+ attribute from the data file for the named instance +$1+.
-          #   @return [$3]
-          #   @!visibility public
+      def compact_predicate_helper_yard_doc(name)
+        <<~YARD.chomp("\n")
+          # @!method #{name}?
+          # @return [Boolean]
+          # @!visibility public
         YARD
-
-        finder_macro = <<~YARD.chomp("\n")
-          # @!macro [new] #{MACRO_FINDER}
-          #   Find the named instance +$1+ from the database.
-          #   @return [#{klass.name}]
-          #   @raise [ActiveRecord::RecordNotFound] if the record does not exist
-          #   @!visibility public
-        YARD
-
-        predicate_macro = <<~YARD.chomp("\n")
-          # @!macro [new] #{MACRO_PREDICATE}
-          #   Check if this record is the named instance +$1+.
-          #   @return [Boolean]
-          #   @!visibility public
-        YARD
-
-        [finder_macro, "", predicate_macro, "", attribute_macro].join("\n")
       end
 
-      def compact_instance_block(name)
-        lines = []
-        lines << "# @!method self.#{name}"
-        lines << "# @!macro #{MACRO_FINDER} #{name}"
-        lines << "# @!method #{name}?"
-        lines << "# @!macro #{MACRO_PREDICATE} #{name}"
-        klass.support_table_attribute_helpers.each do |attribute_name|
-          return_type = attribute_yard_return_type(name, attribute_name)
-          lines << "# @!method self.#{name}_#{attribute_name}"
-          lines << "# @!macro #{MACRO_ATTRIBUTE} #{name} #{attribute_name} #{return_type}"
-        end
-        lines.join("\n")
+      def compact_attribute_helper_yard_doc(name, attribute_name)
+        <<~YARD.chomp("\n")
+          # @!method self.#{name}_#{attribute_name}
+          # @return [#{attribute_yard_return_type(name, attribute_name)}]
+          # @!visibility public
+        YARD
       end
 
       def attribute_yard_return_type(name, attribute_name)

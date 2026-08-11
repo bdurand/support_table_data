@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `sync_table_data!` now emits a single `support_table_data.sync` notification per call. A sync that was retried after a uniqueness violation emitted two.
 - `sync_table_data!` with `delete_missing: true` now raises an `ArgumentError` instead of deleting every row in the table when the data files contain no rows (for example, when a data file was accidentally emptied or truncated).
 - Generated predicate methods (e.g. `record.active?`) now cast the data file value to the attribute type before comparing. Previously the raw file value was compared to the cast database attribute, so predicates silently returned `false` whenever the types differed (guaranteed for CSV data files, where all values are strings).
 - Single table inheritance subclasses no longer raise `NoMethodError` from `instance_names`, `instance_keys`, `protected_instance?`, and other class methods. Subclasses now share the support table state defined on their base class.
@@ -27,6 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The documentation tasks no longer corrupt model source files that contain duplicated generated YARD doc blocks (e.g. from a bad merge); the regex that finds the generated block is no longer greedy and all duplicated blocks are now removed so the file is left with exactly one block.
 - Data file names containing extra dots no longer break the class name detection used by `SupportTableData.sync_all!` to eager load models.
 - Error messages for invalid named instance definitions now include the model class name instead of repeating the instance name.
+- Single table inheritance subclasses now properly inherit named instance helpers regardless of load order.
+- The `:compact` YARD format now emits one comment block per method instead of `@!macro` invocations. YARD only expands a macro when it is attached to a method definition, so the macro form resolved to methods with no description, no `@return`, and no `@raise` tags, and it documented the predicate methods as class methods rather than instance methods.
+- The documentation tasks no longer report success when a model raises an `ArgumentError` for an invalid named instance definition. The rescue that produced an empty list of source files covered the whole lookup rather than just the file path expansion it was meant to guard.
 
 ## 1.6.1
 

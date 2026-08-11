@@ -36,5 +36,6 @@ RSpec.configure do |config|
     Hue.delete_all
     Group.delete_all
     Color.delete_all
+    Shape.delete_all
   end
 end

@@ -103,7 +103,9 @@ module SupportTableData
 
       retried = false
 
-      begin
+      # The instrumentation wraps the retry so that one call emits one event even if the
+      # sync has to be attempted twice.
+      ActiveSupport::Notifications.instrument("support_table_data.sync", class: self) do
         canonical_data = support_table_data.each_with_object({}) do |attributes, hash|
           hash[attributes[support_table_key_attribute].to_s] = attributes
         end
@@ -114,50 +116,38 @@ module SupportTableData
 
         records = where(support_table_key_attribute => canonical_data.keys)
         changes = []
+        synced_ids = []
 
-        ActiveSupport::Notifications.instrument("support_table_data.sync", class: self) do
-          synced_ids = []
-
-          transaction do
-            records.each do |record|
-              key = record[support_table_key_attribute].to_s
-              attributes = canonical_data.delete(key)
-              attributes&.each do |name, value|
-                record.send(:"#{name}=", value) if record.respond_to?(:"#{name}=", true)
-              end
-              if support_table_record_changed?(record)
-                changes << record.changes
-                record.save!
-              end
-
-              synced_ids << record.id if attributes
+        transaction do
+          records.each do |record|
+            key = record[support_table_key_attribute].to_s
+            attributes = canonical_data.delete(key)
+            attributes&.each do |name, value|
+              record.send(:"#{name}=", value) if record.respond_to?(:"#{name}=", true)
             end
-
-            canonical_data.each_value do |attributes|
-              class_name = attributes[inheritance_column]
-              klass = class_name ? sti_class_for(class_name) : self
-              record = klass.new
-              attributes.each do |name, value|
-                record.send(:"#{name}=", value) if record.respond_to?(:"#{name}=", true)
-              end
+            if support_table_record_changed?(record)
               changes << record.changes
               record.save!
-              synced_ids << record.id
             end
 
-            if delete_missing
-              missing_records = where.not(primary_key => synced_ids)
-
-              # Rows managed by data files added to single table inheritance subclasses live in
-              # this table, but they are synced by the subclass, so they are not missing rows.
-              # Keys from this class' own data files are already excluded by the synced ids.
-              managed_keys = instance_keys.compact
-              missing_records = missing_records.where.not(support_table_key_attribute => managed_keys) unless managed_keys.empty?
-
-              missing_records.destroy_all
-            end
+            synced_ids << record.id if attributes
           end
+
+          canonical_data.each_value do |attributes|
+            class_name = attributes[inheritance_column]
+            klass = class_name ? sti_class_for(class_name) : self
+            record = klass.new
+            attributes.each do |name, value|
+              record.send(:"#{name}=", value) if record.respond_to?(:"#{name}=", true)
+            end
+            changes << record.changes
+            record.save!
+            synced_ids << record.id
+          end
+
+          delete_missing_records(where.not(primary_key => synced_ids)) if delete_missing
         end
+
         changes
       rescue ActiveRecord::RecordInvalid => e
         raise SupportTableData::ValidationError.new(e.record)
@@ -340,17 +330,23 @@ module SupportTableData
 
     # Return true if the instance has data being managed from a data file. Instances are matched
     # on the key attribute only. Single table inheritance types are intentionally not considered
-    # since syncing also matches existing rows on just the key attribute and will overwrite a row
-    # regardless of the type it currently has. Data files added to single table inheritance
-    # subclasses are included since those rows live in this table too.
+    # when matching since syncing also matches existing rows on just the key attribute and will
+    # overwrite a row regardless of the type it currently has. Data files added to single table
+    # inheritance subclasses are included since those rows live in this table too.
     #
     # @return [Boolean]
     def protected_instance?(instance)
-      keys = support_table_cached_data_value(:@support_table_protected_keys, support_table_data_files_with_descendants) do |data_files|
-        support_table_data_for_files(data_files).collect { |attributes| attributes[support_table_key_attribute].to_s }
-      end
+      key = instance[support_table_key_attribute].to_s
+      return true if support_table_protected_keys.include?(key)
 
-      keys.include?(instance[support_table_key_attribute].to_s)
+      # The instance may be a single table inheritance subclass that had not been loaded yet
+      # when the keys for this class were calculated. Loading a row instantiates it as its own
+      # subclass, so the subclass can be asked directly rather than relying on it having been
+      # eager loaded before this point.
+      instance_class = instance.class
+      return false if instance_class == self || !instance_class.include?(SupportTableData)
+
+      instance_class.send(:support_table_protected_keys).include?(key)
     end
 
     # Explicitly define other support tables that this model depends on. A support table depends
@@ -370,6 +366,34 @@ module SupportTableData
     end
 
     private
+
+    # Destroy the rows in a relation that are not managed from a data file.
+    #
+    # Rows managed by data files added to single table inheritance subclasses live in this
+    # table, but they are synced by the subclass, so they must not be deleted here. Loading a
+    # row instantiates it as its own subclass, which loads that class if it hasn't been loaded
+    # yet, so `protected_instance?` can consult the subclass directly without having to eager
+    # load the entire application first.
+    #
+    # @param relation [ActiveRecord::Relation] The rows that are candidates for deletion.
+    # @return [void]
+    def delete_missing_records(relation)
+      relation.find_each do |record|
+        next if protected_instance?(record)
+
+        record.destroy
+      end
+    end
+
+    # The key attribute values of every row managed from this class' data files, including
+    # data files added to single table inheritance subclasses that have already been loaded.
+    #
+    # @return [Array<String>]
+    def support_table_protected_keys
+      support_table_cached_data_value(:@support_table_protected_keys, support_table_data_files_with_descendants) do |data_files|
+        support_table_data_for_files(data_files).collect { |attributes| attributes[support_table_key_attribute].to_s }
+      end
+    end
 
     def define_support_table_named_instances
       merged_data = {}
@@ -434,6 +458,11 @@ module SupportTableData
       end
     end
 
+    # Values from the data files are captured in the method closures rather than being
+    # interpolated into the method body as literals. Not every value that can appear in a
+    # data file has an `inspect` representation that is valid Ruby source (`Date` and `Time`
+    # are the notable ones), so interpolating them would raise a SyntaxError when the method
+    # is defined.
     def define_support_table_instance_helper(method_name, attribute_name, attribute_value, redefine: false)
       if redefine
         singleton_class.silence_redefinition_of_method(method_name)
@@ -441,11 +470,10 @@ module SupportTableData
         raise ArgumentError.new("Could not define support table helper method #{name}.#{method_name} because it is already a defined method")
       end
 
-      class_eval <<~RUBY, __FILE__, __LINE__ + 1
-        def self.#{method_name}
-          find_by!(#{attribute_name}: #{attribute_value.inspect})
-        end
-      RUBY
+      attribute_name = attribute_name.to_s
+      singleton_class.send(:define_method, method_name) do
+        find_by!(attribute_name => attribute_value)
+      end
     end
 
     def define_support_table_instance_attribute_helper(method_name, attribute_value, redefine: false)
@@ -455,11 +483,10 @@ module SupportTableData
         raise ArgumentError.new("Could not define support table helper method #{name}.#{method_name} because it is already a defined method")
       end
 
-      class_eval <<~RUBY, __FILE__, __LINE__ + 1
-        def self.#{method_name}
-          #{attribute_value.inspect}.freeze
-        end
-      RUBY
+      # The value is returned directly on every call, so it is copied and frozen to keep
+      # callers from mutating the data shared by all of them.
+      value = support_table_deep_freeze(attribute_value.dup)
+      singleton_class.send(:define_method, method_name) { value }
     end
 
     def define_support_table_predicates_helper(method_name, attribute_name, attribute_value, redefine: false)
@@ -469,11 +496,29 @@ module SupportTableData
         raise ArgumentError.new("Could not define support table helper method #{name}##{method_name} because it is already a defined method")
       end
 
-      class_eval <<~RUBY, __FILE__, __LINE__ + 1
-        def #{method_name}
-          #{attribute_name} == self.class.type_for_attribute(#{attribute_name.inspect}).cast(#{attribute_value.inspect})
+      attribute_name = attribute_name.to_s
+      # The value has to be cast to the attribute type before it can be compared to the value
+      # read off the record. The cast is done lazily and memoized per class because the type
+      # requires a database connection to resolve, which is not necessarily available when the
+      # model class is being loaded.
+      cast_values = {}
+      define_method(method_name) do
+        klass = self.class
+        cast_value = cast_values.fetch(klass) do
+          cast_values[klass] = klass.type_for_attribute(attribute_name).cast(attribute_value)
         end
-      RUBY
+        send(attribute_name) == cast_value
+      end
+    end
+
+    def support_table_deep_freeze(value)
+      case value
+      when Hash
+        value.each_value { |element| support_table_deep_freeze(element) }
+      when Array
+        value.each { |element| support_table_deep_freeze(element) }
+      end
+      value.freeze
     end
 
     def support_table_parse_data_file(file_path)

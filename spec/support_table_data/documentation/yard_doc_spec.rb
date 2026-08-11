@@ -3,6 +3,35 @@
 require "spec_helper"
 
 RSpec.describe SupportTableData::Documentation::YardDoc do
+  # Run the generated documentation through YARD and return the methods it resolved as a hash
+  # of method path (i.e. "Color.red" or "Color#red?") to its sorted list of tags. Generated
+  # docs are only useful if YARD actually attaches the tags to the right method, which cannot
+  # be verified by matching against the generated text.
+  def yard_methods_for(klass)
+    begin
+      require "yard"
+      require "tmpdir"
+    rescue LoadError
+      skip "yard is not available"
+    end
+
+    docs = SupportTableData::Documentation::YardDoc.new(klass).named_instance_yard_docs
+    body = docs.split("\n").collect { |line| line.empty? ? line : "  #{line}" }.join("\n")
+
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, "#{klass.name.underscore}.rb")
+      File.write(path, "class #{klass.name}\n#{body}\nend\n")
+
+      YARD::Registry.clear
+      YARD::Registry.load([path], true)
+      YARD::Registry.all(:method).each_with_object({}) do |method, hash|
+        hash[method.path] = method.tags.collect { |tag| [tag.tag_name, tag.types] }.sort
+      end
+    end
+  ensure
+    YARD::Registry.clear if defined?(YARD::Registry)
+  end
+
   describe "#instance_helper_yard_doc" do
     it "generates YARD documentation for a named instance class method" do
       doc = SupportTableData::Documentation::YardDoc.new(Color)
@@ -122,7 +151,7 @@ RSpec.describe SupportTableData::Documentation::YardDoc do
         end
       end
 
-      it "emits the compact macro form" do
+      it "emits the tags for each method without the prose descriptions" do
         doc = SupportTableData::Documentation::YardDoc.new(Color)
         result = doc.named_instance_yard_docs
 
@@ -130,16 +159,33 @@ RSpec.describe SupportTableData::Documentation::YardDoc do
         expect(result).to include("# @!group Named Instances")
         expect(result).to include("# @!endgroup")
 
-        expect(result).to include("# @!macro [new] support_table_data_finder")
-        expect(result).to include("# @!macro [new] support_table_data_predicate")
-        expect(result).to include("# @!macro [new] support_table_data_attribute")
-        expect(result.scan("# @!macro [new] support_table_data_finder").size).to eq(1)
-
         expect(result).to include("# @!method self.red")
-        expect(result).to include("# @!macro support_table_data_finder red")
         expect(result).to include("# @!method red?")
-        expect(result).to include("# @!macro support_table_data_predicate red")
+        expect(result).to include("# @return [Color]")
+        expect(result).to include("# @return [Boolean]")
         expect(result).not_to include("# Find the named instance +red+ from the database.")
+        expect(result).not_to include("@!macro")
+      end
+
+      it "generates docs that YARD resolves to the same methods and tags as the full format" do
+        compact = yard_methods_for(Color)
+
+        Color.support_table_yard_docs = :full
+        full = yard_methods_for(Color)
+
+        expect(compact.keys).to match_array(full.keys)
+        expect(compact.keys).to include("Color.red", "Color#red?")
+
+        compact.each do |path, tags|
+          expect(tags).to eq(full.fetch(path)), "expected #{path} to have the same tags in both formats"
+        end
+      end
+
+      it "documents the predicate as an instance method and the finder as a class method" do
+        methods = yard_methods_for(Color)
+
+        expect(methods["Color.red"]).to eq([["return", ["Color"]], ["raise", ["ActiveRecord::RecordNotFound"]]].sort)
+        expect(methods["Color#red?"]).to eq([["return", ["Boolean"]]])
       end
     end
 
@@ -154,13 +200,20 @@ RSpec.describe SupportTableData::Documentation::YardDoc do
         end
       end
 
-      it "emits attribute macro invocations with column-derived types" do
+      it "emits attribute helper methods with data-derived types" do
         doc = SupportTableData::Documentation::YardDoc.new(Group)
         result = doc.named_instance_yard_docs
 
         # Group has attribute helpers for group_id (integer) and name (string).
-        expect(result).to include("# @!macro support_table_data_attribute primary group_id Integer")
-        expect(result).to include("# @!macro support_table_data_attribute primary name String")
+        expect(result).to include("# @!method self.primary_group_id\n# @return [Integer]")
+        expect(result).to include("# @!method self.primary_name\n# @return [String]")
+      end
+
+      it "generates attribute helper docs that YARD resolves with the right return types" do
+        methods = yard_methods_for(Group)
+
+        expect(methods["Group.primary_group_id"]).to eq([["return", ["Integer"]]])
+        expect(methods["Group.primary_name"]).to eq([["return", ["String"]]])
       end
     end
 

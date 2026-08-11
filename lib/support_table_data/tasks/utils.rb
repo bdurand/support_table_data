@@ -23,14 +23,18 @@ module SupportTableData
         # @param file_path [String, Pathname, nil] Optional file path to filter by.
         # @return [Array<SupportTableData::Documentation::SourceFile>]
         def support_table_sources(file_path = nil)
-          file_path = Pathname.new(file_path) if file_path.is_a?(String)
-          require file_path.expand_path if file_path
+          resolved_path = expand_file_path(file_path)
+          return [] if file_path && resolved_path.nil?
+
+          require resolved_path.to_s if resolved_path
 
           sources = []
 
           ActiveRecord::Base.descendants.each do |klass|
             next unless klass.include?(SupportTableData)
-            # Skip STI subclasses; only the class that owns the data files gets documented.
+            # Only the class that added the data files is documented. Single table inheritance
+            # subclasses that don't add their own data files inherit the helper methods and
+            # would otherwise duplicate the base class documentation.
             next unless klass.instance_variable_defined?(:@support_table_data_files)
             next if klass.instance_names.empty?
 
@@ -40,12 +44,9 @@ module SupportTableData
             sources << Documentation::SourceFile.new(klass, model_file_path)
           end
 
-          return sources if file_path.nil?
+          return sources if resolved_path.nil?
 
-          resolved_path = Pathname.new(file_path.to_s).expand_path
           sources.select { |source| source.path.expand_path == resolved_path }
-        rescue ArgumentError
-          []
         end
 
         # Return RBS file handlers for all support table models.
@@ -56,6 +57,18 @@ module SupportTableData
           support_table_sources(file_path).map do |source|
             Documentation::RbsFile.new(source.klass, source.path)
           end
+        end
+
+        # Expand a file path argument to an absolute path.
+        #
+        # @param file_path [String, Pathname, nil]
+        # @return [Pathname, nil] nil if no path was given or it cannot be expanded.
+        def expand_file_path(file_path)
+          return nil if file_path.nil?
+
+          Pathname.new(file_path.to_s).expand_path
+        rescue ArgumentError
+          nil
         end
 
         def model_file_path(klass)

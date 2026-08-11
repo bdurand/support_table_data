@@ -114,8 +114,17 @@ RSpec.describe SupportTableData do
         raise ActiveRecord::RecordNotUnique.new("duplicate key") if calls == 1
         original.call(*args, &block)
       end
-      expect(Group.sync_table_data!.size).to eq 3
+      events = []
+      subscriber = ActiveSupport::Notifications.subscribe("support_table_data.sync") { |*args| events << args }
+      begin
+        expect(Group.sync_table_data!.size).to eq 3
+      ensure
+        ActiveSupport::Notifications.unsubscribe(subscriber)
+      end
+
       expect(calls).to eq 2
+      # The retry is an implementation detail; one call emits one event.
+      expect(events.size).to eq 1
     end
 
     it "reraises the error if the retried sync also hits a uniqueness violation" do
@@ -262,6 +271,16 @@ RSpec.describe SupportTableData do
       expect(Size.large_label).to eq "Large"
     end
 
+    it "defines attribute helpers for values that have no literal representation in ruby source" do
+      expect(Size.small_introduced_on).to eq Date.new(2020, 1, 15)
+      expect(Size.large_introduced_on).to eq Date.new(2021, 6, 30)
+    end
+
+    it "returns frozen values from attribute helpers" do
+      expect(Size.small_label).to be_frozen
+      expect(Size.small_introduced_on).to be_frozen
+    end
+
     it "syncs overridden attributes to the existing record instead of creating a new one" do
       Size.sync_table_data!
       expect(Size.count).to eq 3
@@ -351,6 +370,59 @@ RSpec.describe SupportTableData do
       expect(subclass.protected_instance?(light_gray)).to eq true
       expect(subclass.instance_keys).to include 8
     end
+
+    context "when a subclass has not been loaded yet" do
+      # A subclass that has not been loaded yet is not in `descendants`, so the base class has
+      # no way to know about its data files up front. Ruby cannot unload the subclass once the
+      # spec suite has referenced it, so the base class is instead limited to its own data files
+      # to reproduce what it can see in that situation. Reading a row resolves its class from
+      # the type column, and that is what makes the row identifiable as one the subclass owns.
+      #
+      # The override has to be defined on the singleton class rather than stubbed: the subclass
+      # inherits the singleton method and must still get the real implementation.
+      before do
+        Square.sync_table_data!
+        Shape.sync_table_data!
+
+        shape_files = Shape.send(:support_table_data_files)
+        Shape.singleton_class.send(:define_method, :support_table_data_files_with_descendants) do
+          (self == Shape) ? shape_files : super()
+        end
+      end
+
+      after do
+        Shape.singleton_class.send(:remove_method, :support_table_data_files_with_descendants)
+      end
+
+      it "keeps rows managed by the subclass' data files when delete_missing is true" do
+        unmanaged = Shape.new
+        unmanaged.name = "Blob"
+        unmanaged.save!
+
+        Shape.sync_table_data!(delete_missing: true)
+
+        expect(Shape.where(name: "Square").count).to eq 1
+        expect(Shape.where(name: "Circle").count).to eq 1
+        expect(Shape.where(name: "Blob").count).to eq 0
+      end
+
+      it "deletes subclass rows that are not in any data file" do
+        orphan = Square.new
+        orphan.name = "Rhombus"
+        orphan.save!
+
+        Shape.sync_table_data!(delete_missing: true)
+
+        expect(Shape.where(name: "Rhombus").count).to eq 0
+        expect(Shape.where(name: "Square").count).to eq 1
+      end
+
+      it "reports subclass managed rows as protected from the base class" do
+        square = Shape.find_by!(name: "Square")
+
+        expect(Shape.protected_instance?(square)).to eq true
+      end
+    end
   end
 
   describe "instance_names" do
@@ -424,7 +496,7 @@ RSpec.describe SupportTableData do
 
   describe "support_table_classes" do
     it "gets a list of all loaded support table classes with dependencies listed first" do
-      expect(SupportTableData.support_table_classes).to eq [Shade, Group, Hue, Color, Invalid, Polygon, Size]
+      expect(SupportTableData.support_table_classes).to eq [Shade, Group, Hue, Color, Invalid, Polygon, Shape, Size, Square]
     end
   end
 
