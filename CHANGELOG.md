@@ -4,12 +4,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## 1.6.2
+## 1.7.0
 
 ### Fixed
 
 - `sync_table_data!` now emits a single `support_table_data.sync` notification per call. A sync that was retried after a uniqueness violation emitted two.
 - `sync_table_data!` with `delete_missing: true` now raises an `ArgumentError` instead of deleting every row in the table when the data files contain no rows (for example, when a data file was accidentally emptied or truncated).
+- `sync_table_data!` now raises an `ArgumentError` when a data file row has no value for the key attribute (for example, when a key column was renamed or dropped). Previously such rows were collapsed into a single record with a blank key, and with `delete_missing: true` the sync deleted every real row in the table.
+- Syncing a single table inheritance subclass no longer inserts duplicate or wrongly typed rows for records defined in the base class' data files. Existing rows are matched without the inheritance type condition, and new rows default to the type of the class whose data file defines them.
+- Records are now merged in strict data file order, so later files take precedence even when named instance files are mixed with list format files. `named_instance_data` and the named instance helpers use the same merged records that are synced to the database.
+- Entries under a name beginning with an underscore are treated as anonymous records even when the value is a single hash. Previously two files reusing the same underscore name each with a single hash were merged into one record, silently dropping rows.
 - Generated predicate methods (e.g. `record.active?`) now cast the data file value to the attribute type before comparing. Previously the raw file value was compared to the cast database attribute, so predicates silently returned `false` whenever the types differed (guaranteed for CSV data files, where all values are strings).
 - Single table inheritance subclasses no longer raise `NoMethodError` from `instance_names`, `instance_keys`, `protected_instance?`, and other class methods. Subclasses now share the support table state defined on their base class.
 - Named instance helper methods are now redefined when a later data file overrides an attribute or key value, so the helpers always return the merged values that are synced to the database. Previously they permanently returned the values from the first file that defined the named instance.
@@ -29,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Data file names containing extra dots no longer break the class name detection used by `SupportTableData.sync_all!` to eager load models.
 - Error messages for invalid named instance definitions now include the model class name instead of repeating the instance name.
 - Single table inheritance subclasses now properly inherit named instance helpers regardless of load order.
-- The `:compact` YARD format now emits one comment block per method instead of `@!macro` invocations. YARD only expands a macro when it is attached to a method definition, so the macro form resolved to methods with no description, no `@return`, and no `@raise` tags, and it documented the predicate methods as class methods rather than instance methods.
+- The `:compact` YARD format now emits macro invocations that YARD can actually expand. Each generated method gets its own comment block with the `@!macro` invocation indented under its `@!method` line, and the macros no longer use positional parameters (YARD only fills those in from real method calls in the source). The previous form put all directives in one comment block and passed arguments on the invocation line, which YARD does not support; it resolved to methods with no description, no `@return`, and no `@raise` tags, and it documented the predicate methods as class methods rather than instance methods. Macro names are also namespaced per class so models do not overwrite each other's macros.
 - The documentation tasks no longer report success when a model raises an `ArgumentError` for an invalid named instance definition. The rescue that produced an empty list of source files covered the whole lookup rather than just the file path expansion it was meant to guard.
 
 ## 1.6.1

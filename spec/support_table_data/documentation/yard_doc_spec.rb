@@ -151,7 +151,7 @@ RSpec.describe SupportTableData::Documentation::YardDoc do
         end
       end
 
-      it "emits the tags for each method without the prose descriptions" do
+      it "emits shared macro definitions and a short block per method that expands them" do
         doc = SupportTableData::Documentation::YardDoc.new(Color)
         result = doc.named_instance_yard_docs
 
@@ -159,12 +159,12 @@ RSpec.describe SupportTableData::Documentation::YardDoc do
         expect(result).to include("# @!group Named Instances")
         expect(result).to include("# @!endgroup")
 
-        expect(result).to include("# @!method self.red")
-        expect(result).to include("# @!method red?")
-        expect(result).to include("# @return [Color]")
-        expect(result).to include("# @return [Boolean]")
+        expect(result).to include("# @!macro [new] support_table_color_finder\n#   Find this named instance from the database.\n#   @return [Color]")
+        expect(result).to include("# @!macro [new] support_table_color_predicate\n#   Check if this record is this named instance.\n#   @return [Boolean]")
+
+        expect(result).to include("# @!method self.red\n#   @!macro support_table_color_finder")
+        expect(result).to include("# @!method red?\n#   @!macro support_table_color_predicate")
         expect(result).not_to include("# Find the named instance +red+ from the database.")
-        expect(result).not_to include("@!macro")
       end
 
       it "generates docs that YARD resolves to the same methods and tags as the full format" do
@@ -205,8 +205,8 @@ RSpec.describe SupportTableData::Documentation::YardDoc do
         result = doc.named_instance_yard_docs
 
         # Group has attribute helpers for group_id (integer) and name (string).
-        expect(result).to include("# @!method self.primary_group_id\n# @return [Integer]")
-        expect(result).to include("# @!method self.primary_name\n# @return [String]")
+        expect(result).to include("# @!method self.primary_group_id\n#   @!macro support_table_group_attribute\n#   @return [Integer]")
+        expect(result).to include("# @!method self.primary_name\n#   @!macro support_table_group_attribute\n#   @return [String]")
       end
 
       it "generates attribute helper docs that YARD resolves with the right return types" do

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "active_support/core_ext/module/redefine_method"
+require "concurrent/map"
 
 # This concern can be mixed into models that represent static support tables. These are small tables
 # that have a limited number of rows, and have values that are often tied to the logic in the code.
@@ -69,8 +70,8 @@ module SupportTableData
     # Get the YARD documentation mode for this model. One of:
     #
     # * `:full`    - emit a verbose comment block per generated method (default)
-    # * `:compact` - emit shared @!macro definitions plus a short
-    #                @!method/@!macro pair per generated method
+    # * `:compact` - emit shared @!macro definitions plus a short comment
+    #                block per generated method that expands them
     # * `:none`    - generate no YARD docs for this model; the rake task will
     #                strip any existing generated YARD docs
     #
@@ -110,11 +111,25 @@ module SupportTableData
           hash[attributes[support_table_key_attribute].to_s] = attributes
         end
 
+        if canonical_data.include?("")
+          raise ArgumentError.new("Cannot sync #{name} because the data files contain a row with no value for the key attribute #{support_table_key_attribute}")
+        end
+
         if delete_missing && canonical_data.empty? && exists?
           raise ArgumentError.new("Refusing to sync #{name} with delete_missing enabled because the data files contain no rows; this would delete every row in the table")
         end
 
-        records = where(support_table_key_attribute => canonical_data.keys)
+        # Rows are matched on the key attribute alone, so the lookup must not be scoped
+        # to this class's single table inheritance type. A subclass syncing rows from
+        # inherited data files has to find them no matter what type they currently have
+        # or it would insert duplicates.
+        scope = finder_needs_type_condition? ? base_class : self
+        records = scope.where(support_table_key_attribute => canonical_data.keys)
+
+        # New rows default to the type of the class whose data files define them so that
+        # a subclass syncing inherited files does not create them with its own type.
+        record_classes = support_table_record_classes
+
         changes = []
         synced_ids = []
 
@@ -135,7 +150,11 @@ module SupportTableData
 
           canonical_data.each_value do |attributes|
             class_name = attributes[inheritance_column]
-            klass = class_name ? sti_class_for(class_name) : self
+            klass = if class_name
+              sti_class_for(class_name)
+            else
+              record_classes[attributes[support_table_key_attribute].to_s] || self
+            end
             record = klass.new
             attributes.each do |name, value|
               record.send(:"#{name}=", value) if record.respond_to?(:"#{name}=", true)
@@ -171,7 +190,10 @@ module SupportTableData
     def add_support_table_data(data_file_path)
       root_dir = support_table_data_directory || SupportTableData.data_directory || Dir.pwd
       support_table_mutex.synchronize do
-        @support_table_data_files = support_table_data_files + [File.expand_path(data_file_path, root_dir)]
+        # Only the files added directly to this class are stored on it. Files added to a
+        # base class are composed in at read time so a single table inheritance subclass
+        # sees files the base class adds later, no matter the order the classes set up in.
+        @support_table_data_files = (@support_table_data_files || []) + [File.expand_path(data_file_path, root_dir)]
       end
       define_support_table_named_instances
     end
@@ -220,73 +242,14 @@ module SupportTableData
     # @return [Array<Hash>] List of attributes for all records in the data files.
     # @api private
     def support_table_data_for_files(data_files)
-      records = []
-      named_records = {}
-
-      data_files.each do |data_file_path|
-        file_data = support_table_parse_data_file(data_file_path)
-
-        if file_data.is_a?(Hash)
-          file_data.each do |instance_name, attributes|
-            unless attributes.is_a?(Hash)
-              # A name mapped to a list of records (i.e. a name beginning with an underscore)
-              # holds anonymous records that are only identified by the key attribute.
-              Array(attributes).flatten.each { |record| records << record.dup }
-              next
-            end
-
-            # Records are merged by their name so that a later data file can override
-            # attributes on a named record without having to repeat the key attribute.
-            instance_name = instance_name.to_s
-            existing = named_records[instance_name]
-            if existing
-              existing.merge!(attributes)
-            else
-              record = attributes.dup
-              named_records[instance_name] = record
-              records << record
-            end
-          end
-        else
-          Array(file_data).flatten.each { |record| records << record.dup }
-        end
-      end
-
-      # Records that resolve to the same key attribute value are merged together.
-      data = {}
-      records.each do |attributes|
-        key_value = attributes[support_table_key_attribute].to_s
-        existing = data[key_value]
-        if existing
-          existing.merge!(attributes)
-        else
-          data[key_value] = attributes
-        end
-      end
-
-      data.values
+      support_table_merged_records(data_files).first
     end
 
     # Get the data for a named instances from the data files.
     #
     # @return [Hasn] Hash of named instance attributes.
     def named_instance_data(name)
-      data = {}
-      name = name.to_s
-
-      support_table_data_files.each do |data_file_path|
-        file_data = support_table_parse_data_file(data_file_path)
-        next unless file_data.is_a?(Hash)
-
-        file_data.each do |instance_name, attributes|
-          next unless name == instance_name.to_s
-          next unless attributes.is_a?(Hash)
-
-          data.merge!(attributes)
-        end
-      end
-
-      data
+      support_table_merged_records(support_table_data_files).last[name.to_s] || {}
     end
 
     # Get the names of all named instances.
@@ -395,25 +358,91 @@ module SupportTableData
       end
     end
 
-    def define_support_table_named_instances
-      merged_data = {}
+    # Parse the data files and merge the records they define. Files are processed in
+    # order so that later files take precedence no matter how each file is structured.
+    # Records are matched both by their instance name and by their key attribute value.
+    # Entry names that begin with an underscore do not define named instances; their
+    # values hold anonymous records identified only by the key attribute.
+    #
+    # @param data_files [Array<String>] The paths of the data files to read.
+    # @return [Array(Array<Hash>, Hash<String, Hash>)] The ordered list of merged records
+    #   and the named instance records by name.
+    def support_table_merged_records(data_files)
+      records = []
+      named_records = {}
+      keyed_records = {}
 
-      support_table_data_files.each do |file_path|
-        data = support_table_parse_data_file(file_path)
-        next unless data.is_a?(Hash)
+      merge_record = lambda do |attributes, instance_name|
+        record = named_records[instance_name] if instance_name
+        if record.nil? && (instance_name.nil? || attributes.include?(support_table_key_attribute))
+          record = keyed_records[attributes[support_table_key_attribute].to_s]
+        end
 
-        data.each do |name, attributes|
-          name = name.to_s
-          existing = merged_data[name]
-          merged_data[name] = if existing.is_a?(Hash) && attributes.is_a?(Hash)
-            existing.merge(attributes)
+        if record
+          record.merge!(attributes)
+        else
+          record = attributes.dup
+          records << record
+        end
+
+        named_records[instance_name] = record if instance_name
+        keyed_records[record[support_table_key_attribute].to_s] = record
+      end
+
+      data_files.each do |data_file_path|
+        file_data = support_table_parse_data_file(data_file_path)
+
+        unless file_data.is_a?(Hash)
+          Array(file_data).flatten.each { |attributes| merge_record.call(attributes, nil) }
+          next
+        end
+
+        file_data.each do |instance_name, attributes|
+          instance_name = instance_name.to_s
+          if instance_name.start_with?("_")
+            anonymous_records = attributes.is_a?(Hash) ? [attributes] : Array(attributes).flatten
+            anonymous_records.each { |record_attributes| merge_record.call(record_attributes, nil) }
+          elsif attributes.is_a?(Hash)
+            merge_record.call(attributes, instance_name)
           else
-            attributes
+            raise ArgumentError.new("Cannot define named instance #{instance_name} on #{name}; value must be a Hash")
           end
         end
       end
 
-      merged_data.each do |name, attributes|
+      [records, named_records]
+    end
+
+    # The classes in the hierarchy that added their own data files, listed base class
+    # first, along with the file paths each one added.
+    #
+    # @return [Array<Array(Class, Array<String>)>]
+    def support_table_data_file_owners
+      owners = superclass.include?(SupportTableData) ? superclass.send(:support_table_data_file_owners) : []
+      own_files = @support_table_data_files
+      owners += [[self, own_files]] if own_files && !own_files.empty?
+      owners
+    end
+
+    # Map each record's key attribute value to the class in the hierarchy whose own data
+    # files define it. Used to determine the single table inheritance type for new rows
+    # that do not specify one in the data files.
+    #
+    # @return [Hash<String, Class>]
+    def support_table_record_classes
+      record_classes = {}
+      support_table_data_file_owners.each do |owner, files|
+        next if owner == self
+
+        support_table_data_for_files(files).each do |attributes|
+          record_classes[attributes[support_table_key_attribute].to_s] ||= owner
+        end
+      end
+      record_classes
+    end
+
+    def define_support_table_named_instances
+      support_table_merged_records(support_table_data_files).last.each do |name, attributes|
         support_table_mutex.synchronize do
           define_support_table_named_instance_methods(name, attributes)
         end
@@ -439,12 +468,12 @@ module SupportTableData
         if instance_names_map[method_name] != key_value
           define_support_table_instance_helper(method_name, support_table_key_attribute, key_value, redefine: true)
           define_support_table_predicates_helper("#{method_name}?", support_table_key_attribute, key_value, redefine: true)
-          @support_table_instance_names = instance_names_map.merge(method_name => key_value)
+          @support_table_instance_names = (@support_table_instance_names || {}).merge(method_name => key_value)
         end
       else
         define_support_table_instance_helper(method_name, support_table_key_attribute, key_value)
         define_support_table_predicates_helper("#{method_name}?", support_table_key_attribute, key_value)
-        @support_table_instance_names = instance_names_map.merge(method_name => key_value)
+        @support_table_instance_names = (@support_table_instance_names || {}).merge(method_name => key_value)
       end
 
       support_table_attribute_helpers_map.each do |attribute_name, defined_methods|
@@ -500,12 +529,13 @@ module SupportTableData
       # The value has to be cast to the attribute type before it can be compared to the value
       # read off the record. The cast is done lazily and memoized per class because the type
       # requires a database connection to resolve, which is not necessarily available when the
-      # model class is being loaded.
-      cast_values = {}
+      # model class is being loaded. The map is shared by every instance, so it needs to be
+      # thread safe on Ruby implementations without a global interpreter lock.
+      cast_values = Concurrent::Map.new
       define_method(method_name) do
         klass = self.class
-        cast_value = cast_values.fetch(klass) do
-          cast_values[klass] = klass.type_for_attribute(attribute_name).cast(attribute_value)
+        cast_value = cast_values.fetch_or_store(klass) do
+          klass.type_for_attribute(attribute_name).cast(attribute_value)
         end
         send(attribute_name) == cast_value
       end
@@ -598,31 +628,31 @@ module SupportTableData
       descendants.each do |subclass|
         next unless subclass.include?(SupportTableData)
 
-        subclass_files = subclass.send(:support_table_data_files)
-        # Subclasses without their own data files inherit the exact same array from this class.
-        next if subclass_files.equal?(files)
-
-        files += (subclass_files - files)
+        files |= subclass.send(:support_table_data_files)
       end
 
       files
     end
 
     # The class level state used by the concern is stored in instance variables on the
-    # class where the concern was included. These readers fall back to the superclass
-    # so that single table inheritance subclasses share the state defined on their
-    # base class rather than crashing on uninitialized instance variables.
+    # class where the concern was included. These readers compose in or fall back to the
+    # superclass state so that single table inheritance subclasses share the state defined
+    # on their base class rather than crashing on uninitialized instance variables.
 
     def support_table_mutex
       @support_table_mutex || (superclass.include?(SupportTableData) ? superclass.send(:support_table_mutex) : nil)
     end
 
     def support_table_data_files
-      @support_table_data_files || (superclass.include?(SupportTableData) ? superclass.send(:support_table_data_files) : [])
+      inherited = superclass.include?(SupportTableData) ? superclass.send(:support_table_data_files) : []
+      own = @support_table_data_files || []
+      inherited.empty? ? own : inherited + own
     end
 
     def support_table_instance_names_map
-      @support_table_instance_names || (superclass.include?(SupportTableData) ? superclass.send(:support_table_instance_names_map) : {})
+      inherited = superclass.include?(SupportTableData) ? superclass.send(:support_table_instance_names_map) : {}
+      own = @support_table_instance_names || {}
+      inherited.empty? ? own : inherited.merge(own)
     end
 
     def support_table_attribute_helpers_map

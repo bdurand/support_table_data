@@ -12,7 +12,8 @@ module SupportTableData
       # is controlled by the model's `support_table_yard_docs` setting:
       #
       # * `:full`    - verbose comment block per method (default)
-      # * `:compact` - the same tags per method without the prose descriptions
+      # * `:compact` - shared @!macro definitions plus a short comment block
+      #                per method that expands them
       # * `:none`    - generate no docs at all
       #
       # @return [String, nil] The YARD documentation, or nil if no docs should
@@ -102,13 +103,17 @@ module SupportTableData
         yard_lines.join("\n")
       end
 
-      # The compact format drops the prose description from each method and keeps only the
-      # tags. Every method still needs its own comment block separated by a blank line:
-      # YARD builds one docstring per block, so combining methods into a single block would
-      # both drop the tags for all but the last method and leak the `self.` scope of a
-      # singleton method onto the instance methods that follow it.
+      # The compact format defines the shared documentation once as macros and expands
+      # them under each generated method. YARD imposes three rules on this layout: each
+      # method needs its own comment block (tags and the `self.` scope apply to the whole
+      # block), a macro invocation must be indented under its @!method line to attach to
+      # that method, and macro parameters ($1, etc.) cannot be used because YARD only
+      # fills them in from real method calls in the source. Macro names are global to the
+      # YARD registry, so they are namespaced with the class name.
       def generate_compact_yard_docs(instance_names)
         yard_lines = ["# @!group Named Instances"]
+        yard_lines << ""
+        yard_lines << compact_macro_definitions
 
         instance_names.sort.each do |name|
           yard_lines << ""
@@ -127,29 +132,63 @@ module SupportTableData
         yard_lines.join("\n")
       end
 
+      def compact_macro_definitions
+        finder_macro = <<~YARD.chomp("\n")
+          # @!macro [new] #{compact_macro_name("finder")}
+          #   Find this named instance from the database.
+          #   @return [#{klass.name}]
+          #   @raise [ActiveRecord::RecordNotFound] if the record does not exist
+          #   @!visibility public
+        YARD
+
+        predicate_macro = <<~YARD.chomp("\n")
+          # @!macro [new] #{compact_macro_name("predicate")}
+          #   Check if this record is this named instance.
+          #   @return [Boolean]
+          #   @!visibility public
+        YARD
+
+        macros = [finder_macro, "", predicate_macro]
+
+        if klass.support_table_attribute_helpers.any?
+          attribute_macro = <<~YARD.chomp("\n")
+            # @!macro [new] #{compact_macro_name("attribute")}
+            #   Get this attribute from the data file for this named instance.
+            #   @!visibility public
+          YARD
+          macros << ""
+          macros << attribute_macro
+        end
+
+        macros.join("\n")
+      end
+
       def compact_instance_helper_yard_doc(name)
         <<~YARD.chomp("\n")
           # @!method self.#{name}
-          # @return [#{klass.name}]
-          # @raise [ActiveRecord::RecordNotFound] if the record does not exist
-          # @!visibility public
+          #   @!macro #{compact_macro_name("finder")}
         YARD
       end
 
       def compact_predicate_helper_yard_doc(name)
         <<~YARD.chomp("\n")
           # @!method #{name}?
-          # @return [Boolean]
-          # @!visibility public
+          #   @!macro #{compact_macro_name("predicate")}
         YARD
       end
 
+      # The attribute macro cannot carry the @return tag because the return type differs
+      # per method, so each attribute method adds its own.
       def compact_attribute_helper_yard_doc(name, attribute_name)
         <<~YARD.chomp("\n")
           # @!method self.#{name}_#{attribute_name}
-          # @return [#{attribute_yard_return_type(name, attribute_name)}]
-          # @!visibility public
+          #   @!macro #{compact_macro_name("attribute")}
+          #   @return [#{attribute_yard_return_type(name, attribute_name)}]
         YARD
+      end
+
+      def compact_macro_name(suffix)
+        "support_table_#{klass.name.underscore.tr("/", "_")}_#{suffix}"
       end
 
       def attribute_yard_return_type(name, attribute_name)
