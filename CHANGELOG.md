@@ -8,33 +8,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- `sync_table_data!` now emits a single `support_table_data.sync` notification per call. A sync that was retried after a uniqueness violation emitted two.
-- `sync_table_data!` with `delete_missing: true` now raises an `ArgumentError` instead of deleting every row in the table when the data files contain no rows (for example, when a data file was accidentally emptied or truncated).
-- `sync_table_data!` now raises an `ArgumentError` when a data file row has no value for the key attribute (for example, when a key column was renamed or dropped). Previously such rows were collapsed into a single record with a blank key, and with `delete_missing: true` the sync deleted every real row in the table.
-- Syncing a single table inheritance subclass no longer inserts duplicate or wrongly typed rows for records defined in the base class' data files. Existing rows are matched without the inheritance type condition, and new rows default to the type of the class whose data file defines them.
-- Records are now merged in strict data file order, so later files take precedence even when named instance files are mixed with list format files. `named_instance_data` and the named instance helpers use the same merged records that are synced to the database.
-- Entries under a name beginning with an underscore are treated as anonymous records even when the value is a single hash. Previously two files reusing the same underscore name each with a single hash were merged into one record, silently dropping rows.
-- Generated predicate methods (e.g. `record.active?`) now cast the data file value to the attribute type before comparing. Previously the raw file value was compared to the cast database attribute, so predicates silently returned `false` whenever the types differed (guaranteed for CSV data files, where all values are strings).
-- Single table inheritance subclasses no longer raise `NoMethodError` from `instance_names`, `instance_keys`, `protected_instance?`, and other class methods. Subclasses now share the support table state defined on their base class.
-- Named instance helper methods are now redefined when a later data file overrides an attribute or key value, so the helpers always return the merged values that are synced to the database. Previously they permanently returned the values from the first file that defined the named instance.
-- `named_instance_attribute_helpers` can now be called again with an attribute that was already registered without raising an `ArgumentError`.
-- Data files that override attributes on a named instance are now merged by the instance name rather than only by the key attribute. Previously, an override that did not repeat the key attribute value (for example, a file containing only `large:` with a `label`) was treated as a brand new record; the override was never applied to the real row and a row with only the overridden attributes was inserted on every sync.
-- YAML data files can now use anchors/aliases and date/time values. Previously these raised `Psych::AliasesNotEnabled` or `Psych::DisallowedClass` errors.
-- `protected_instance?` and `instance_keys` no longer return stale results when data files are added after their values were first computed. This includes single table inheritance subclasses that computed their values before a data file was added to their base class.
-- `protected_instance?` and `instance_keys` now include data files added to single table inheritance subclasses when called on a base class. Previously rows managed by a subclass' data file were reported as unprotected by the base class even though they live in the same table.
-- `sync_table_data!` with `delete_missing: true` no longer deletes rows that are managed by data files added to single table inheritance subclasses. Previously syncing the base class deleted rows that the subclass was responsible for syncing.
-- Fixed broken cycle detection in the autosave association check during syncs that could cause infinite recursion on cyclic autosave associations.
-- `sync_table_data!` now retries once on `ActiveRecord::RecordNotUnique` errors caused by concurrent syncs inserting the same rows from another process.
+- `sync_table_data!` now retries once on `ActiveRecord::RecordNotUnique` errors caused by a concurrent sync in another process inserting the same rows.
+- `sync_table_data!` with `delete_missing: true` now raises an `ArgumentError` instead of deleting every row in the table when the data files contain no rows.
+- `sync_table_data!` now raises an `ArgumentError` when a data file row has no value for the key attribute. Previously such rows were collapsed into a single record with a blank key.
 - `sync_table_data!` now returns an empty array instead of `nil` when the table does not exist.
-- `named_instance` now raises a clear `ActiveRecord::RecordNotFound` error for undefined named instances instead of querying the database for a `nil` key (which could silently return a row with a `NULL` key value).
-- Memoized class-level state is now consistently synchronized with the class mutex to avoid races on non-MRI Ruby implementations.
+- Fixed broken cycle detection in the autosave association check during syncs that could cause infinite recursion on cyclic autosave associations.
+- Syncing a single table inheritance subclass no longer inserts duplicate or wrongly typed rows for records defined in the base class' data files. Existing rows are matched without the inheritance type condition, and new rows default to the type of the class whose data file defines them.
+- Single table inheritance subclasses now share the support table state defined on their base class regardless of load order. Previously class methods like `instance_names` and `protected_instance?` raised `NoMethodError` and named instance helpers could be missing on subclasses.
+- `protected_instance?` and `instance_keys` now include data files added to single table inheritance subclasses and no longer return stale results when data files are added after their values were first computed.
+- `sync_table_data!` with `delete_missing: true` no longer deletes rows that are managed by data files added to single table inheritance subclasses.
+- Records are now merged in strict data file order, so later files take precedence even when named instance files are mixed with list format files.
+- Data files that override attributes on a named instance are now merged by the instance name rather than only by the key attribute. Previously an override that did not repeat the key attribute value was treated as a new record and inserted as an extra row on every sync.
+- Named instance helper methods and `named_instance_data` now return the merged values that are synced to the database. Previously the helpers permanently returned the values from the first file that defined the named instance.
+- Entries under a name beginning with an underscore are treated as anonymous records even when the value is a single hash. Previously two files reusing the same underscore name each with a single hash were merged into one record, silently dropping rows.
+- YAML data files can now use anchors/aliases and date/time values. Previously these raised `Psych::AliasesNotEnabled` or `Psych::DisallowedClass` errors.
+- Generated predicate methods (e.g. `record.active?`) now cast the data file value to the attribute type before comparing, so they no longer silently return `false` when the types differ (always the case for CSV data files, where all values are strings).
+- `named_instance` now raises an `ActiveRecord::RecordNotFound` error for undefined named instances instead of querying the database for a `nil` key.
+- `named_instance_attribute_helpers` can now be called again with an attribute that was already registered without raising an `ArgumentError`.
+- Modifications to memoized class-level state are now synchronized to avoid races on Ruby implementations without a global interpreter lock.
 - Setting `config.support_table.auto_sync = false` before the gem is loaded is no longer overwritten back to `true` by the Railtie.
-- The documentation tasks no longer corrupt model source files that contain duplicated generated YARD doc blocks (e.g. from a bad merge); the regex that finds the generated block is no longer greedy and all duplicated blocks are now removed so the file is left with exactly one block.
 - Data file names containing extra dots no longer break the class name detection used by `SupportTableData.sync_all!` to eager load models.
 - Error messages for invalid named instance definitions now include the model class name instead of repeating the instance name.
-- Single table inheritance subclasses now properly inherit named instance helpers regardless of load order.
-- The `:compact` YARD format now emits macro invocations that YARD can actually expand. Each generated method gets its own comment block with the `@!macro` invocation indented under its `@!method` line, and the macros no longer use positional parameters (YARD only fills those in from real method calls in the source). The previous form put all directives in one comment block and passed arguments on the invocation line, which YARD does not support; it resolved to methods with no description, no `@return`, and no `@raise` tags, and it documented the predicate methods as class methods rather than instance methods. Macro names are also namespaced per class so models do not overwrite each other's macros.
-- The documentation tasks no longer report success when a model raises an `ArgumentError` for an invalid named instance definition. The rescue that produced an empty list of source files covered the whole lookup rather than just the file path expansion it was meant to guard.
+- The `:compact` YARD format now emits macros that YARD can actually expand. Previously the generated docs resolved to methods with no description, `@return`, or `@raise` tags and documented the predicate methods as class methods. Macro names are also namespaced per class so models do not overwrite each other's macros.
+- The documentation tasks now remove duplicated generated YARD doc blocks (e.g. left over from a bad merge) instead of corrupting the model source file.
+- The documentation tasks no longer report success when a model raises an `ArgumentError` for an invalid named instance definition.
 
 ## 1.6.1
 
