@@ -1,10 +1,3 @@
+ruby_version: 2.6
+
 format: progress
-
-ruby_version: 2.5
-
-ignore:
-  - "**/*":
-    - Style/RedundantParentheses
-  - "spec/**/*":
-    - Lint/ConstantDefinitionInBlock
-    - Lint/UselessAssignment

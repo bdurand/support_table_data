@@ -80,8 +80,8 @@ namespace :support_table_data do
       SupportTableData::Tasks::Utils.eager_load!
       SupportTableData::Tasks::Utils.support_table_rbs_files(args[:file_path]).each do |rbs_file|
         next if rbs_file.up_to_date?
+        next unless rbs_file.write!
 
-        rbs_file.write!
         puts "Wrote RBS signatures for #{rbs_file.klass.name} to #{rbs_file.path}."
       end
     end

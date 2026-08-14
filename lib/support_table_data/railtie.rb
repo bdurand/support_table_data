@@ -7,7 +7,7 @@ module SupportTableData
     end
 
     config.support_table.data_directory ||= "db/support_tables"
-    config.support_table.auto_sync ||= true
+    config.support_table.auto_sync = true if config.support_table.auto_sync.nil?
 
     initializer "support_table_data" do |app|
       SupportTableData.data_directory ||= app.root.join(app.config.support_table&.data_directory).to_s

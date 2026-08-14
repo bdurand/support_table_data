@@ -2,7 +2,7 @@
 
 require "spec_helper"
 
-describe SupportTableData do
+RSpec.describe SupportTableData do
   let(:red) { Color.find_by(name: "Red") }
   let(:green) { Color.find_by(name: "Green") }
   let(:blue) { Color.find_by(name: "Blue") }
@@ -87,6 +87,54 @@ describe SupportTableData do
       Group.sync_table_data!(delete_missing: true)
       expect(Group.count).to eq 3
       expect(Group.pluck(:name)).to match_array ["primary", "secondary", "gray"]
+    end
+
+    it "refuses to delete all rows when delete_missing is true and the data files contain no rows" do
+      Group.sync_table_data!
+      allow(Group).to receive(:support_table_data).and_return([])
+      expect { Group.sync_table_data!(delete_missing: true) }.to raise_error(ArgumentError, /Refusing to sync Group/)
+      expect(Group.count).to eq 3
+    end
+
+    it "does not raise on empty data files with delete_missing when the table is already empty" do
+      Invalid.delete_all
+      allow(Invalid).to receive(:support_table_data).and_return([])
+      expect(Invalid.sync_table_data!(delete_missing: true)).to eq []
+    end
+
+    it "returns an empty array if the table does not exist" do
+      allow(Group).to receive(:table_exists?).and_return(false)
+      expect(Group.sync_table_data!).to eq []
+    end
+
+    it "retries once if a concurrent sync inserted the same rows" do
+      calls = 0
+      allow(Group).to receive(:transaction).and_wrap_original do |original, *args, &block|
+        calls += 1
+        raise ActiveRecord::RecordNotUnique.new("duplicate key") if calls == 1
+        original.call(*args, &block)
+      end
+      events = []
+      subscriber = ActiveSupport::Notifications.subscribe("support_table_data.sync") { |*args| events << args }
+      begin
+        expect(Group.sync_table_data!.size).to eq 3
+      ensure
+        ActiveSupport::Notifications.unsubscribe(subscriber)
+      end
+
+      expect(calls).to eq 2
+      # The retry is an implementation detail; one call emits one event.
+      expect(events.size).to eq 1
+    end
+
+    it "reraises the error if the retried sync also hits a uniqueness violation" do
+      calls = 0
+      allow(Group).to receive(:transaction) do
+        calls += 1
+        raise ActiveRecord::RecordNotUnique.new("duplicate key")
+      end
+      expect { Group.sync_table_data! }.to raise_error(ActiveRecord::RecordNotUnique)
+      expect(calls).to eq 2
     end
   end
 
@@ -202,6 +250,179 @@ describe SupportTableData do
     it "raises an error if the method is already defined" do
       expect { Invalid.add_support_table_data("invalid.yml") }.to raise_error(ArgumentError)
     end
+
+    it "casts the data file value when comparing in predicate methods" do
+      Size.sync_table_data!
+      small = Size.find_by!(name: "small")
+      expect(small.id).to eq 1
+      expect(small.small?).to eq true
+      expect(small.medium?).to eq false
+    end
+
+    it "supports YAML aliases and date values in data files" do
+      medium = Size.named_instance_data("medium")
+      expect(medium["active"]).to eq true
+      expect(medium["introduced_on"]).to eq Date.new(2020, 1, 15)
+      expect(medium["label"]).to eq "Medium"
+    end
+
+    it "redefines attribute helpers when a later data file overrides an attribute" do
+      expect(Size.small_label).to eq "Small"
+      expect(Size.large_label).to eq "Large"
+    end
+
+    it "defines attribute helpers for values that have no literal representation in ruby source" do
+      expect(Size.small_introduced_on).to eq Date.new(2020, 1, 15)
+      expect(Size.large_introduced_on).to eq Date.new(2021, 6, 30)
+    end
+
+    it "returns frozen values from attribute helpers" do
+      expect(Size.small_label).to be_frozen
+      expect(Size.small_introduced_on).to be_frozen
+    end
+
+    it "syncs overridden attributes to the existing record instead of creating a new one" do
+      Size.sync_table_data!
+      expect(Size.count).to eq 3
+      expect(Size.find(3).label).to eq "Large"
+      expect(Size.large_label).to eq Size.find(3).label
+    end
+  end
+
+  describe "single table inheritance" do
+    it "shares support table state with subclasses" do
+      expect(Rectangle.instance_names).to eq Polygon.instance_names
+      expect(Rectangle.instance_keys).to eq Polygon.instance_keys
+    end
+
+    it "determines protected instances for subclass records" do
+      Polygon.sync_table_data!
+      expect(Polygon.rectangle.protected_instance?).to eq true
+      expect(Triangle.new(name: "Scalene").protected_instance?).to eq false
+    end
+
+    it "protects subclass records regardless of the type in the data files" do
+      # Syncing matches existing rows on just the key attribute, so a record with a key value
+      # from the data files will be overwritten no matter what type it currently has.
+      expect(Triangle.new(name: "Rectangle").protected_instance?).to eq true
+    end
+
+    it "does not delete rows managed by a subclass' data files when delete_missing is true" do
+      base_class = Class.new(ActiveRecord::Base) do
+        include SupportTableData
+
+        self.table_name = "colors"
+      end
+      subclass = Class.new(base_class)
+      base_class.add_support_table_data("colors/named_colors.yml")
+      subclass.add_support_table_data("colors/colors.json")
+
+      subclass.sync_table_data!
+      expect(base_class.where(id: [1, 3, 8, 9]).count).to eq 4
+
+      unmanaged = base_class.new
+      unmanaged.id = 99
+      unmanaged.save!
+
+      base_class.sync_table_data!(delete_missing: true)
+
+      # Rows 8 and 9 are only in the subclass' data file, but they still live in this table.
+      expect(base_class.where(id: [8, 9]).count).to eq 2
+      expect(base_class.exists?(99)).to eq false
+    end
+
+    it "includes data files added to subclasses when called on the base class" do
+      base_class = Class.new(ActiveRecord::Base) do
+        include SupportTableData
+
+        self.table_name = "colors"
+      end
+      subclass = Class.new(base_class)
+      base_class.add_support_table_data("colors/named_colors.yml")
+
+      light_gray = base_class.new
+      light_gray.id = 8
+      expect(base_class.protected_instance?(light_gray)).to eq false
+      expect(base_class.instance_keys).to_not include 8
+
+      # Rows from a subclass' data files live in the same table, so the base class needs to
+      # know about them as well.
+      subclass.add_support_table_data("colors/colors.json")
+      expect(base_class.protected_instance?(light_gray)).to eq true
+      expect(base_class.instance_keys).to include 8
+    end
+
+    it "picks up data files added to the base class after a subclass memoized its values" do
+      base_class = Class.new(ActiveRecord::Base) do
+        include SupportTableData
+
+        self.table_name = "colors"
+      end
+      subclass = Class.new(base_class)
+      base_class.add_support_table_data("colors/named_colors.yml")
+
+      light_gray = subclass.new
+      light_gray.id = 8
+      expect(subclass.protected_instance?(light_gray)).to eq false
+      expect(subclass.instance_keys).to_not include 8
+
+      base_class.add_support_table_data("colors/colors.json")
+      expect(subclass.protected_instance?(light_gray)).to eq true
+      expect(subclass.instance_keys).to include 8
+    end
+
+    context "when a subclass has not been loaded yet" do
+      # A subclass that has not been loaded yet is not in `descendants`, so the base class has
+      # no way to know about its data files up front. Ruby cannot unload the subclass once the
+      # spec suite has referenced it, so the base class is instead limited to its own data files
+      # to reproduce what it can see in that situation. Reading a row resolves its class from
+      # the type column, and that is what makes the row identifiable as one the subclass owns.
+      #
+      # The override has to be defined on the singleton class rather than stubbed: the subclass
+      # inherits the singleton method and must still get the real implementation.
+      before do
+        Square.sync_table_data!
+        Shape.sync_table_data!
+
+        shape_files = Shape.send(:support_table_data_files)
+        Shape.singleton_class.send(:define_method, :support_table_data_files_with_descendants) do
+          (self == Shape) ? shape_files : super()
+        end
+      end
+
+      after do
+        Shape.singleton_class.send(:remove_method, :support_table_data_files_with_descendants)
+      end
+
+      it "keeps rows managed by the subclass' data files when delete_missing is true" do
+        unmanaged = Shape.new
+        unmanaged.name = "Blob"
+        unmanaged.save!
+
+        Shape.sync_table_data!(delete_missing: true)
+
+        expect(Shape.where(name: "Square").count).to eq 1
+        expect(Shape.where(name: "Circle").count).to eq 1
+        expect(Shape.where(name: "Blob").count).to eq 0
+      end
+
+      it "deletes subclass rows that are not in any data file" do
+        orphan = Square.new
+        orphan.name = "Rhombus"
+        orphan.save!
+
+        Shape.sync_table_data!(delete_missing: true)
+
+        expect(Shape.where(name: "Rhombus").count).to eq 0
+        expect(Shape.where(name: "Square").count).to eq 1
+      end
+
+      it "reports subclass managed rows as protected from the base class" do
+        square = Shape.find_by!(name: "Square")
+
+        expect(Shape.protected_instance?(square)).to eq true
+      end
+    end
   end
 
   describe "instance_names" do
@@ -224,6 +445,12 @@ describe SupportTableData do
       expect(Group.primary_name).to eq "primary"
       expect(Group.secondary_name).to eq "secondary"
       expect(Group.gray_name).to eq "gray"
+    end
+
+    it "is idempotent when called again with an attribute that is already registered" do
+      expect { Group.named_instance_attribute_helpers(:name) }.to_not raise_error
+      expect(Group.primary_name).to eq "primary"
+      expect(Group.support_table_attribute_helpers).to match_array ["group_id", "name"]
     end
 
     it "can get a list of the defined attribute helpers" do
@@ -249,11 +476,27 @@ describe SupportTableData do
       expect(orange.protected_instance?).to eq true
       expect(brown.protected_instance?).to eq false
     end
+
+    it "picks up instances from data files added after the protected keys were memoized" do
+      klass = Class.new(ActiveRecord::Base) do
+        include SupportTableData
+
+        self.table_name = "colors"
+      end
+      klass.add_support_table_data("colors/named_colors.yml")
+
+      light_gray = klass.new
+      light_gray.id = 8
+      expect(light_gray.protected_instance?).to eq false
+
+      klass.add_support_table_data("colors/colors.json")
+      expect(light_gray.protected_instance?).to eq true
+    end
   end
 
   describe "support_table_classes" do
     it "gets a list of all loaded support table classes with dependencies listed first" do
-      expect(SupportTableData.support_table_classes).to eq [Shade, Group, Hue, Color, Invalid, Polygon]
+      expect(SupportTableData.support_table_classes).to eq [Shade, Group, Hue, Color, Invalid, Polygon, Shape, Size, Square]
     end
   end
 
@@ -267,6 +510,18 @@ describe SupportTableData do
         "hex" => "0xFF0000",
         "group_name" => "primary",
         "hue_name" => "red"
+      })
+    end
+
+    it "merges overrides for a named instance that do not repeat the key attribute" do
+      data = Size.support_table_data
+      expect(data.size).to eq 3
+      expect(data).to include({
+        "id" => 3,
+        "name" => "large",
+        "label" => "Large",
+        "active" => false,
+        "introduced_on" => Date.new(2021, 6, 30)
       })
     end
 
